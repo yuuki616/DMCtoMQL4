@@ -66,6 +66,13 @@ extern double mmMultiplier = 1.0;
 extern double mmStep = 0.0;
 extern double InitialCapital = 10000; //InitialCapital (0 means whole account balance). Used in some MM methods.
 
+// DMCMM parameters
+enum DMCMM_PersistModeEnum { DMCMM_PERSIST_FILE = 0, DMCMM_PERSIST_GV = 1 };
+extern double DMCMM_BaseLot = 0.01;
+extern double DMCMM_WinEpsMoney = 0.0;
+extern DMCMM_PersistModeEnum DMCMM_PersistMode = DMCMM_PERSIST_FILE;
+extern int DMCMM_LogLevel = 1;
+
 //+------------------------------------------------------------------+
 // Trading Options variables
 //+------------------------------------------------------------------+
@@ -177,6 +184,11 @@ bool strategyUsesATM = false;
 
 double initialBalance = 0;
 
+int dmcmm_seq[];
+int dmcmm_stock = 0;
+int dmcmm_streak = 0;
+ulong dmcmm_lastTicket = 0;
+
 
 const double CLOSE_ALL = -1;
 
@@ -186,8 +198,10 @@ const double CLOSE_ALL = -1;
 
 void OnTick() {
 
-   sqInitStart();       
-   
+   sqInitStart();
+
+   dmcmm_process_history(Symbol(), MagicNumberA);
+
    sqManageOrders(MagicNumberA);
    
    openingOrdersAllowed = sqHandleTradingOptions();
@@ -399,8 +413,10 @@ int OnInit() {
    objMaxDistanceFromMarket = new CMaxDistanceFromMarket();
    objMaxTradesPerDay = new CMaxTradesPerDay();
    objMinMaxSLPT = new CMinMaxSLPT();
-   
-   
+
+   dmcmm_load(Symbol(), MagicNumberA);
+
+
    // OnInit  rules
    //------------------------
    // Rule: Int
@@ -465,7 +481,9 @@ void OnDeinit(const int reason) {
    delete objMaxDistanceFromMarket;
    delete objMaxTradesPerDay;
    delete objMinMaxSLPT;
-   
+
+   dmcmm_save(Symbol(), MagicNumberA);
+
    return;
 }
     
@@ -4948,393 +4966,264 @@ class CMinMaxSLPT : public CTradingOption {
 
 // create variable for class instance (required)
 CMinMaxSLPT* objMinMaxSLPT;
-// DistributedMonteCarloMM - 分散管理モンテカルロ法による資金管理
+// DMCMM - 単数列分解管理モンテカルロ法
+// Functions
+void dmcmm_array_remove(int &arr[], int index){
+   int size = ArraySize(arr);
+   if(index < 0 || index >= size) return;
+   for(int i=index; i<size-1; i++) arr[i] = arr[i+1];
+   ArrayResize(arr, size-1);
+}
 
-// グローバル変数
-int g_sequence[]; // 数列
-double g_stock = 0; // ストック
-int g_consecutiveWins = 0; // 連勝数
-int g_lastProcessedOrderIndex = -1; // 直近処理済み履歴インデックス
+void dmcmm_array_insert(int &arr[], int index, int value){
+   int size = ArraySize(arr);
+   ArrayResize(arr, size+1);
+   for(int i=size; i>index; i--) arr[i] = arr[i-1];
+   arr[index] = value;
+}
 
-// 配列の初期化
-void initSequence() {
-   if(ArraySize(g_sequence) == 0) {
-      ArrayResize(g_sequence, 2);
-      g_sequence[0] = 0;
-      g_sequence[1] = 1;
+string dmcmm_seq_to_string(){
+   string s="";
+   int size = ArraySize(dmcmm_seq);
+   for(int i=0;i<size;i++){
+      s += IntegerToString(dmcmm_seq[i]);
+      if(i<size-1) s += ",";
+   }
+   return s;
+}
+
+void dmcmm_reset(){
+   ArrayResize(dmcmm_seq,2);
+   dmcmm_seq[0]=0;
+   dmcmm_seq[1]=1;
+   dmcmm_stock=0;
+   dmcmm_streak=0;
+   dmcmm_lastTicket=0;
+}
+
+void dmcmm_log(string text){
+   if(DMCMM_LogLevel>0) Print("[DMCMM] "+text);
+}
+
+void dmcmm_save(string symbol,int magic){
+   if(DMCMM_PersistMode == DMCMM_PERSIST_GV){
+      string base = StringFormat("DMCMM_%s_%d_", symbol, magic);
+      int len = ArraySize(dmcmm_seq);
+      double code=0;
+      for(int i=0;i<len;i++) code = code*1000 + dmcmm_seq[i];
+      GlobalVariableSet(base+"SEQ", code);
+      GlobalVariableSet(base+"LEN", len);
+      GlobalVariableSet(base+"STOCK", dmcmm_stock);
+      GlobalVariableSet(base+"STREAK", dmcmm_streak);
+      GlobalVariableSet(base+"LASTT", (double)dmcmm_lastTicket);
+   } else {
+      string fname = StringFormat("DMCMM_%s_%d.csv", symbol, magic);
+      int handle = FileOpen(fname, FILE_WRITE|FILE_CSV);
+      if(handle!=INVALID_HANDLE){
+         FileWrite(handle, dmcmm_seq_to_string(), dmcmm_stock, dmcmm_streak, (int)dmcmm_lastTicket);
+         FileClose(handle);
+      }
    }
 }
 
-// 勝ちの場合の数列処理
-void processWin() {
-   int seqSize = ArraySize(g_sequence);
-   
-   if(seqSize == 2 && g_sequence[0] == 0 && g_sequence[1] == 1) {
-      g_consecutiveWins++;
-   }
-   
-   if(seqSize == 2) {
-      ArrayResize(g_sequence, 2);
-      g_sequence[0] = 0;
-      g_sequence[1] = 1;
-   } 
-   else if(seqSize == 3) {
-      int value = g_sequence[2];
-      ArrayResize(g_sequence, 2);
-      
-      if(value % 2 == 0) {
-         int newVal = value / 2;
-         g_sequence[0] = newVal;
-         g_sequence[1] = newVal;
+void dmcmm_load(string symbol,int magic){
+   if(DMCMM_PersistMode == DMCMM_PERSIST_GV){
+      string base = StringFormat("DMCMM_%s_%d_", symbol, magic);
+      if(!GlobalVariableCheck(base+"LEN")){
+         dmcmm_reset();
+         return;
+      }
+      int len = (int)GlobalVariableGet(base+"LEN");
+      double code = GlobalVariableGet(base+"SEQ");
+      ArrayResize(dmcmm_seq, len);
+      for(int i=len-1;i>=0;i--){
+         dmcmm_seq[i] = (int)MathMod(code,1000);
+         code = MathFloor(code/1000);
+      }
+      dmcmm_stock = (int)GlobalVariableGet(base+"STOCK");
+      dmcmm_streak = (int)GlobalVariableGet(base+"STREAK");
+      dmcmm_lastTicket = (ulong)GlobalVariableGet(base+"LASTT");
+   } else {
+      string fname = StringFormat("DMCMM_%s_%d.csv", symbol, magic);
+      int handle = FileOpen(fname, FILE_READ|FILE_CSV);
+      if(handle==INVALID_HANDLE){
+         dmcmm_reset();
+         return;
+      }
+      string seqStr = FileReadString(handle);
+      dmcmm_stock = FileReadInteger(handle);
+      dmcmm_streak = FileReadInteger(handle);
+      dmcmm_lastTicket = (ulong)FileReadInteger(handle);
+      FileClose(handle);
+      if(StringLen(seqStr)==0){
+         dmcmm_reset();
       } else {
-         int leftVal = value / 2;
-         int rightVal = leftVal + 1; // 修正: a1 -> 1
-         g_sequence[0] = leftVal;
-         g_sequence[1] = rightVal;
-      }
-   } 
-   else if(seqSize > 3) {
-      // 左端削除
-      for(int i = 0; i < seqSize - 1; i++) {
-         g_sequence[i] = g_sequence[i + 1];
-      }
-      ArrayResize(g_sequence, seqSize - 1);
-      seqSize--;
-      
-      // 右から2番目削除
-      if(seqSize >= 2) {
-         for(int i = seqSize - 2; i < seqSize - 1; i++) {
-            g_sequence[i] = g_sequence[i + 1];
-         }
-         ArrayResize(g_sequence, seqSize - 1);
+         string parts[];
+         int n = StringSplit(seqStr, ',', parts);
+         ArrayResize(dmcmm_seq, n);
+         for(int i=0;i<n;i++) dmcmm_seq[i]=(int)StrToInteger(parts[i]);
       }
    }
-   
-   averageSequence();
 }
 
-// 負けの場合の数列処理
-void processLoss() {
-   if(g_consecutiveWins <= 5) {
-      g_consecutiveWins = 0;
-   } else if(g_consecutiveWins >= 6) {
-      int consecutiveProfit = (g_consecutiveWins - 3) * 5 - 8;
-      int normalProfit = g_consecutiveWins - 2;
-      g_stock += (consecutiveProfit - normalProfit);
-      g_consecutiveWins = 0;
-   }
-   
-   int seqSize = ArraySize(g_sequence);
-   if(seqSize > 0) {
-      int left = g_sequence[0];
-      int right = g_sequence[seqSize - 1];
-      int addition = left + right;
-      
-      // 配列に追加
-      ArrayResize(g_sequence, seqSize + 1);
-      g_sequence[seqSize] = addition;
-   }
-   
-   averageSequence();
-   
-   seqSize = ArraySize(g_sequence);
-   if(seqSize > 0 && g_sequence[0] <= g_stock) {
-      g_stock -= g_sequence[0];
-      g_sequence[0] = 0;
-   }
-   
-   if(seqSize > 0 && g_sequence[0] >= 1) {
-      int redistributionValue = g_sequence[0];
-      g_sequence[0] = 0;
-      
-      int sum = 0;
-      for(int i = 0; i < seqSize; i++) {
-         sum += g_sequence[i];
+void dmcmm_average(){
+   int len = ArraySize(dmcmm_seq);
+   if(len<=0) return;
+   int sum=0;
+   for(int i=0;i<len;i++) sum+=dmcmm_seq[i];
+   int left = dmcmm_seq[0];
+   if(len-1<=0) return;
+   int A = sum % (len-1);
+   int B = sum % len;
+   if(left==0){
+      dmcmm_array_remove(dmcmm_seq,0);
+      int newLen = ArraySize(dmcmm_seq);
+      if(newLen<=0) return;
+      if(A==0){
+         for(int i=0;i<newLen;i++) dmcmm_seq[i]=0;
+         int avg = sum/newLen;
+         for(int i=0;i<newLen;i++) dmcmm_seq[i]+=avg;
+         dmcmm_array_insert(dmcmm_seq,0,0);
+      } else {
+         for(int i=0;i<newLen;i++) dmcmm_seq[i]=0;
+         int avg = sum/newLen;
+         int rem = sum%newLen;
+         for(int i=0;i<newLen;i++) dmcmm_seq[i]+=avg;
+         dmcmm_seq[0]+=rem;
+         dmcmm_array_insert(dmcmm_seq,0,0);
       }
-      sum += redistributionValue;
-      
-      int redistributionCount = seqSize - 1;
-      if(redistributionCount > 0) {
-         int redistributionJudgment = sum % redistributionCount;
-         int overallRedistribution = sum / redistributionCount;
-         
-         if(redistributionValue < redistributionCount) {
-            if(seqSize > 1) {
-               g_sequence[1] += redistributionValue;
-            }
+   } else {
+      for(int i=0;i<len;i++) dmcmm_seq[i]=0;
+      int avg = sum/len;
+      for(int i=0;i<len;i++) dmcmm_seq[i]+=avg;
+      if(B>0 && len>1) dmcmm_seq[1]+=B;
+   }
+}
+
+void dmcmm_on_win(){
+   int len = ArraySize(dmcmm_seq);
+   if(len<2) return;
+   int left = dmcmm_seq[0];
+   int right = dmcmm_seq[len-1];
+   if(len==2 && left==0 && right==1) dmcmm_streak++;
+   if(len==2){
+      dmcmm_seq[0]=0; dmcmm_seq[1]=1;
+   } else if(len==3){
+      int v = dmcmm_seq[2];
+      if(v%2==0){
+         int h=v/2; dmcmm_seq[0]=h; dmcmm_seq[1]=h;
+      } else {
+         int l=v/2; int r=l+v%2; dmcmm_seq[0]=l; dmcmm_seq[1]=r;
+      }
+      ArrayResize(dmcmm_seq,2);
+   } else {
+      dmcmm_array_remove(dmcmm_seq,0);
+      dmcmm_array_remove(dmcmm_seq,ArraySize(dmcmm_seq)-1);
+   }
+   dmcmm_average();
+}
+
+void dmcmm_on_lose(){
+   if(dmcmm_streak <=5){
+      dmcmm_streak=0;
+   } else {
+      int consecutiveProfit=(dmcmm_streak-3)*5-8;
+      int normalProfit=dmcmm_streak-2;
+      dmcmm_stock += (consecutiveProfit - normalProfit);
+      dmcmm_streak=0;
+   }
+   int len = ArraySize(dmcmm_seq);
+   if(len>0){
+      int add = dmcmm_seq[0] + dmcmm_seq[len-1];
+      dmcmm_array_insert(dmcmm_seq, len, add);
+   }
+   dmcmm_average();
+   len = ArraySize(dmcmm_seq);
+   if(len>0 && dmcmm_seq[0] <= dmcmm_stock){
+      dmcmm_stock -= dmcmm_seq[0];
+      dmcmm_seq[0]=0;
+   }
+   if(len>0 && dmcmm_seq[0] >=1){
+      int redistribute = dmcmm_seq[0];
+      dmcmm_seq[0]=0;
+      int total=0;
+      for(int i=0;i<ArraySize(dmcmm_seq);i++) total+=dmcmm_seq[i];
+      total += redistribute;
+      int n = ArraySize(dmcmm_seq)-1;
+      if(n>0){
+         if(redistribute < n){
+            dmcmm_seq[1]+=redistribute;
          } else {
-            // 左端削除
-            for(int i = 0; i < seqSize - 1; i++) {
-               g_sequence[i] = g_sequence[i + 1];
-            }
-            ArrayResize(g_sequence, seqSize - 1);
-            seqSize--;
-            
-            // 平均値をセット
-            for(int i = 0; i < seqSize; i++) {
-               g_sequence[i] = overallRedistribution;
-            }
-            
-            if(redistributionJudgment == 0) {
-               // 左端に0を追加
-               ArrayResize(g_sequence, seqSize + 1);
-               for(int i = seqSize; i > 0; i--) {
-                  g_sequence[i] = g_sequence[i - 1];
-               }
-               g_sequence[0] = 0;
-            } else {
-               g_sequence[0] += redistributionJudgment;
-               
-               // 左端に0を追加
-               ArrayResize(g_sequence, seqSize + 1);
-               for(int i = seqSize; i > 0; i--) {
-                  g_sequence[i] = g_sequence[i - 1];
-               }
-               g_sequence[0] = 0;
-            }
+            int r = total % n;
+            int avg = total / n;
+            dmcmm_array_remove(dmcmm_seq,0);
+            int newLen = ArraySize(dmcmm_seq);
+            for(int i=0;i<newLen;i++) dmcmm_seq[i]=0;
+            for(int i=0;i<newLen;i++) dmcmm_seq[i]+=avg;
+            if(r>0) dmcmm_seq[0]+=r;
+            dmcmm_array_insert(dmcmm_seq,0,0);
          }
       }
    }
 }
 
-// 数列の平均化処理
-void averageSequence() {
-   int seqSize = ArraySize(g_sequence);
-   if(seqSize == 0) return;
-   
-   int sum = 0;
-   for(int i = 0; i < seqSize; i++) {
-      sum += g_sequence[i];
+void dmcmm_process_history(string symbol,int magic){
+   dmcmm_load(symbol,magic);
+   int total=OrdersHistoryTotal();
+   ulong tickets[];
+   ArrayResize(tickets,0);
+   for(int i=0;i<total;i++){
+      if(OrderSelect(i,SELECT_BY_POS,MODE_HISTORY)){
+         if(OrderSymbol()==symbol && OrderMagicNumber()==magic && OrderCloseTime()>0){
+            ulong ticket=OrderTicket();
+            if(ticket>dmcmm_lastTicket){
+               int idx=ArraySize(tickets);
+               ArrayResize(tickets,idx+1);
+               tickets[idx]=ticket;
+            }
+         }
+      }
    }
-   
-   int left = g_sequence[0];
-   if(seqSize - 1 == 0) return;
-   
-   int A = sum % (seqSize - 1);
-   int B = sum % seqSize;
-   
-   if(left == 0 && A == 0) {
-      // 左端削除
-      for(int i = 0; i < seqSize - 1; i++) {
-         g_sequence[i] = g_sequence[i + 1];
-      }
-      ArrayResize(g_sequence, seqSize - 1);
-      seqSize--;
-      
-      // 全て0にセット
-      for(int i = 0; i < seqSize; i++) {
-         g_sequence[i] = 0;
-      }
-      
-      // 平均値をセット
-      int avg = sum / (seqSize);
-      for(int i = 0; i < seqSize; i++) {
-         g_sequence[i] += avg;
-      }
-      
-      // 左端に0を追加
-      ArrayResize(g_sequence, seqSize + 1);
-      for(int i = seqSize; i > 0; i--) {
-         g_sequence[i] = g_sequence[i - 1];
-      }
-      g_sequence[0] = 0;
-      
-   } else if(left == 0 && A >= 1) {
-      // 左端削除
-      for(int i = 0; i < seqSize - 1; i++) {
-         g_sequence[i] = g_sequence[i + 1];
-      }
-      ArrayResize(g_sequence, seqSize - 1);
-      seqSize--;
-      
-      // 全て0にセット
-      for(int i = 0; i < seqSize; i++) {
-         g_sequence[i] = 0;
-      }
-      
-      // 平均値をセット
-      int avg = sum / seqSize;
-      int remainder = sum % seqSize;
-      
-      for(int i = 0; i < seqSize; i++) {
-         g_sequence[i] += avg;
-      }
-      
-      if(seqSize > 0) {
-         g_sequence[0] += remainder;
-      }
-      
-      // 左端に0を追加
-      ArrayResize(g_sequence, seqSize + 1);
-      for(int i = seqSize; i > 0; i--) {
-         g_sequence[i] = g_sequence[i - 1];
-      }
-      g_sequence[0] = 0;
-      
-   } else if(left >= 1 && B == 0) {
-      // 全て0にセット
-      for(int i = 0; i < seqSize; i++) {
-         g_sequence[i] = 0;
-      }
-      
-      // 平均値をセット
-      int avg = sum / seqSize;
-      for(int i = 0; i < seqSize; i++) {
-         g_sequence[i] += avg;
-      }
-      
-   } else if(left >= 1 && B >= 1) {
-      // 全て0にセット
-      for(int i = 0; i < seqSize; i++) {
-         g_sequence[i] = 0;
-      }
-      
-      // 平均値をセット
-      int avg = sum / seqSize;
-      int remainder = sum % seqSize;
-      
-      for(int i = 0; i < seqSize; i++) {
-         g_sequence[i] += avg;
-      }
-      
-      if(seqSize > 1) {
-         g_sequence[1] += remainder;
+   if(ArraySize(tickets)>0){
+      ArraySort(tickets,WHOLE_ARRAY,0,MODE_ASCEND);
+      for(int j=0;j<ArraySize(tickets);j++){
+         ulong ticket=tickets[j];
+         if(OrderSelect(ticket,SELECT_BY_TICKET)){
+            double pl=OrderProfit()+OrderSwap()+OrderCommission();
+            bool win=(pl >= DMCMM_WinEpsMoney);
+            if(win) dmcmm_on_win(); else dmcmm_on_lose();
+            dmcmm_lastTicket=ticket;
+            dmcmm_save(symbol,magic);
+            dmcmm_log(StringFormat("ticket=%I64u result=%s",ticket,win?"WIN":"LOSE"));
+         }
       }
    }
 }
 
-// 注文履歴から最後のトレード結果を更新
-void updateSequenceFromLastTrade() {
-   int historyCount = OrdersHistoryTotal();
-   if(historyCount <= 0) return;
-   
-   int lastIndex = historyCount - 1;
-   if(lastIndex <= g_lastProcessedOrderIndex) return;
-   
-   bool result = OrderSelect(lastIndex, SELECT_BY_POS, MODE_HISTORY);
-   if(!result) return;
-   
-   double pl = 0;
-   if(OrderType() == OP_BUY) {
-      pl = OrderClosePrice() - OrderOpenPrice();
-   } else if(OrderType() == OP_SELL) {
-      pl = OrderOpenPrice() - OrderClosePrice();
-   }
-   
-   if(pl > 0) {
-      processWin();
-   } else if(pl < 0) {
-      processLoss();
-   }
-   
-   g_lastProcessedOrderIndex = lastIndex;
+double dmcmm_calc_lot(string symbol,int magic){
+   dmcmm_load(symbol,magic);
+   int len = ArraySize(dmcmm_seq);
+   int bet=0;
+   if(len>=2) bet = dmcmm_seq[0] + dmcmm_seq[len-1];
+   int mult = 1;
+   if(dmcmm_streak==3) mult=2;
+   else if(dmcmm_streak==4) mult=3;
+   else if(dmcmm_streak>=5) mult=5;
+   double lot = bet * DMCMM_BaseLot * mult;
+   dmcmm_log(StringFormat("seq=[%s], stock=%d, streak=%d, bet=%d, mult=%d, lot=%g", dmcmm_seq_to_string(), dmcmm_stock, dmcmm_streak, bet, mult, lot));
+   return lot;
 }
 
 // メインの資金管理関数
 double sqDistributedMonteCarloMM(string symbol, int orderType, double price, double sl, double RiskInPercent, int decimals, int StopLossPips, double LotsIfNoMM, double MaximumLots, double multiplier, double sizeStep) {
-   Verbose("Computing Money Management for order - Distributed Monte Carlo MM");
-
    if(UseMoneyManagement == false) {
-      Verbose("Use Money Management = false, MM not used");
       return (mmLotsIfNoMM);
    }
-   
-   // 数列初期化
-   initSequence();
-   
-   // 最後のトレード結果から内部状態を更新
-   updateSequenceFromLastTrade();
-   
-   symbol = correctSymbol(symbol);
-   
-   double openPrice = price > 0 ? price : (orderType == OP_BUY ? sqGetAsk(symbol) : sqGetBid(symbol));
-   double LotSize = 0;
-
-   if(RiskInPercent < 0) {
-      Verbose("Computing Money Management - Incorrect RiskInPercent size, it must be above 0");
-      return(0);
-   }
-   
-   double PointValue = MarketInfo(symbol, MODE_TICKVALUE) / MarketInfo(symbol, MODE_TICKSIZE);   
-   double Smallest_Lot = MarketInfo(symbol, MODE_MINLOT);
-   double Largest_Lot = MarketInfo(symbol, MODE_MAXLOT);    
-   double LotStep = MarketInfo(symbol, MODE_LOTSTEP);
-   
-   if(sl == 0) {
-      sl = openPrice - StopLossPips * sqGetPointCoef(symbol);
-   }
-   
-   sl = NormalizeDouble(sl, (int) MarketInfo(symbol, MODE_DIGITS));
-   
-   // --- 動的な betAmount の算出 ---
-   int seqSize = ArraySize(g_sequence);
-   int left = 0;
-   int right = 0;
-   
-   if(seqSize > 0) {
-      left = g_sequence[0];
-   }
-   
-   if(seqSize > 0) {
-      right = g_sequence[seqSize - 1];
-   }
-   
-   int betValue = left + right;
-   double betAmount = betValue;
-   
-   // 連勝数に応じた倍率調整
-   if(g_consecutiveWins == 3) {
-      betAmount *= 2.0;
-   } else if(g_consecutiveWins == 4) {
-      betAmount *= 3.0;
-   } else if(g_consecutiveWins >= 5) {
-      betAmount *= 5.0;
-   }
-   
-   // 最終リスクの算出
-   double moneyToRisk = NormalizeDouble(AccountEquity() * RiskInPercent / 100 * betAmount, 7);
-   
-   //Maximum drawdown of this order if we buy 1 lot 
-   double oneLotSLDrawdown = NormalizeDouble(PointValue * MathAbs(openPrice - sl), 7);
-   
-   if(oneLotSLDrawdown > 0) {
-      LotSize = moneyToRisk / oneLotSLDrawdown;
-   }
-   else {
-      LotSize = 0;
-   }
-
-   // Order size multiplier
-   LotSize = LotSize * multiplier;
-   
-   // round computed trade size 
-   LotSize = roundDown(LotSize, sizeStep, decimals);
-
-   Verbose("MODE_TICKSIZE: ", DoubleToStr(MarketInfo(symbol, MODE_TICKSIZE)), ", MODE_TICKVALUE: ", DoubleToStr(MarketInfo(symbol, MODE_TICKVALUE)), ", MODE_POINT: ", DoubleToStr(MarketInfo(symbol, MODE_POINT)));
-   Verbose("Computing Money Management - Smallest_Lot: ", DoubleToStr(Smallest_Lot), ", Largest_Lot: ", DoubleToStr(Largest_Lot),", Computed LotSize: ", DoubleToStr(LotSize));
-   Verbose("Max money to risk: ", DoubleToStr(moneyToRisk), ", SL:", DoubleToStr(sl), ", One lot drawdown: ", DoubleToStr(oneLotSLDrawdown), ", Point value: ", DoubleToStr(PointValue));
-   Verbose("Sequence size: ", IntegerToString(seqSize), ", left: ", IntegerToString(left), ", right: ", IntegerToString(right), ", betValue: ", IntegerToString(betValue), ", ConsecutiveWins: ", IntegerToString(g_consecutiveWins));
-
-   if(LotSize <= 0) {
-      Verbose("Calculated LotSize is <= 0. Using LotsIfNoMM value: ", DoubleToStr(LotsIfNoMM), ")");
-      LotSize = LotsIfNoMM;
-   }
-   
-   if(LotSize > MaximumLots) {
-      Verbose("LotSize is too big. LotSize set to maximal allowed value (MaximumLots): ", DoubleToStr(MaximumLots));
-      LotSize = MaximumLots;
-   }
-
-   if(LotSize < Smallest_Lot) {
-      Verbose("Calculated LotSize is too small. Minimal allowed lot size from the broker is: ", DoubleToStr(Smallest_Lot), ". Please, increase your risk or set fixed LotSize.");
-      LotSize = 0;
-   }
-   else if(LotSize > Largest_Lot) {
-      Verbose("LotSize is too big. LotSize set to maximal allowed market value: ", DoubleToStr(Largest_Lot));
-      LotSize = Largest_Lot;
-   }
-
-   return (LotSize);
+   string sym = correctSymbol(symbol);
+   double lot = dmcmm_calc_lot(sym, MagicNumberA);
+   lot = fixLotSize(sym, lot);
+   if(MaximumLots > 0 && lot > MaximumLots) lot = MaximumLots;
+   return lot;
 }
 
 //=============================================================================
