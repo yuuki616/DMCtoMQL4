@@ -5003,6 +5003,10 @@ void dmcmm_array_insert(long &arr[], int index, long value){
    arr[index] = value;
 }
 
+string LongToString(long value){
+   return StringFormat("%I64d", value);
+}
+
 string dmcmm_seq_to_string(){
    string s="";
    int size = ArraySize(dmcmm_seq);
