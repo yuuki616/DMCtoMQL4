@@ -5221,6 +5221,10 @@ double sqDistributedMonteCarloMM(string symbol, int orderType, double price, dou
    }
    string sym = correctSymbol(symbol);
    double lot = dmcmm_calc_lot(sym, MagicNumberA);
+   if(lot <= 0){
+      dmcmm_log("bet is zero, skipping order");
+      return(0);
+   }
    lot = fixLotSize(sym, lot);
    if(MaximumLots > 0 && lot > MaximumLots) lot = MaximumLots;
    return lot;
