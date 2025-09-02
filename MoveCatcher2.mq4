@@ -5169,13 +5169,15 @@ void dmcmm_on_win(){
       dmcmm_seq[0]=0; dmcmm_seq[1]=1;
       branch="LEN2";
    } else if(len==3){
-      long v = dmcmm_seq[2];
+      dmcmm_array_remove(dmcmm_seq,0);
+      dmcmm_array_remove(dmcmm_seq,ArraySize(dmcmm_seq)-1);
+      long v = dmcmm_seq[0];
+      ArrayResize(dmcmm_seq,2);
       if(v%2==0){
          long h=v/2; dmcmm_seq[0]=h; dmcmm_seq[1]=h; branch="LEN3E";
       } else {
          long l=v/2; long r=l+v%2; dmcmm_seq[0]=l; dmcmm_seq[1]=r; branch="LEN3O";
       }
-      ArrayResize(dmcmm_seq,2);
    } else {
       dmcmm_array_remove(dmcmm_seq,0);
       dmcmm_array_remove(dmcmm_seq,ArraySize(dmcmm_seq)-1);
