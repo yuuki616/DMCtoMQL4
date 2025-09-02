@@ -5022,8 +5022,8 @@ void dmcmm_reset(){
    dmcmm_lastTicket=0;
 }
 
-void dmcmm_log(string text){
-   if(DMCMM_LogLevel>0) Print("[DMCMM] "+text);
+void dmcmm_log(int level, string text){
+   if(DMCMM_LogLevel >= level) Print("[DMCMM] "+text);
 }
 
 void dmcmm_save(string symbol,int magic){
@@ -5096,6 +5096,7 @@ void dmcmm_average(){
    if(len-1<=0) return;
    int A = sum % (len-1);
    int B = sum % len;
+   string branch="";
    if(left==0){
       dmcmm_array_remove(dmcmm_seq,0);
       int newLen = ArraySize(dmcmm_seq);
@@ -5105,6 +5106,7 @@ void dmcmm_average(){
          int avg = sum/newLen;
          for(int i=0;i<newLen;i++) dmcmm_seq[i]+=avg;
          dmcmm_array_insert(dmcmm_seq,0,0);
+         branch="L0A0";
       } else {
          for(int i=0;i<newLen;i++) dmcmm_seq[i]=0;
          int avg = sum/newLen;
@@ -5112,13 +5114,16 @@ void dmcmm_average(){
          for(int i=0;i<newLen;i++) dmcmm_seq[i]+=avg;
          dmcmm_seq[0]+=rem;
          dmcmm_array_insert(dmcmm_seq,0,0);
+         branch="L0A1";
       }
    } else {
       for(int i=0;i<len;i++) dmcmm_seq[i]=0;
       int avg = sum/len;
       for(int i=0;i<len;i++) dmcmm_seq[i]+=avg;
       if(B>0 && len>1) dmcmm_seq[1]+=B;
+      branch = (B>0 && len>1) ? "L1B1" : "L1B0";
    }
+   dmcmm_log(2, StringFormat("average(%s) seq=[%s]", branch, dmcmm_seq_to_string()));
 }
 
 void dmcmm_on_win(){
@@ -5127,21 +5132,25 @@ void dmcmm_on_win(){
    int left = dmcmm_seq[0];
    int right = dmcmm_seq[len-1];
    if(len==2 && left==0 && right==1) dmcmm_streak++;
+   string branch="";
    if(len==2){
       dmcmm_seq[0]=0; dmcmm_seq[1]=1;
+      branch="LEN2";
    } else if(len==3){
       int v = dmcmm_seq[2];
       if(v%2==0){
-         int h=v/2; dmcmm_seq[0]=h; dmcmm_seq[1]=h;
+         int h=v/2; dmcmm_seq[0]=h; dmcmm_seq[1]=h; branch="LEN3E";
       } else {
-         int l=v/2; int r=l+v%2; dmcmm_seq[0]=l; dmcmm_seq[1]=r;
+         int l=v/2; int r=l+v%2; dmcmm_seq[0]=l; dmcmm_seq[1]=r; branch="LEN3O";
       }
       ArrayResize(dmcmm_seq,2);
    } else {
       dmcmm_array_remove(dmcmm_seq,0);
       dmcmm_array_remove(dmcmm_seq,ArraySize(dmcmm_seq)-1);
+      branch="LENM";
    }
    dmcmm_average();
+   dmcmm_log(2, StringFormat("win(%s) seq=[%s] stock=%d streak=%d", branch, dmcmm_seq_to_string(), dmcmm_stock, dmcmm_streak));
 }
 
 void dmcmm_on_lose(){
@@ -5160,9 +5169,11 @@ void dmcmm_on_lose(){
    }
    dmcmm_average();
    len = ArraySize(dmcmm_seq);
+   string branch="";
    if(len>0 && dmcmm_seq[0] <= dmcmm_stock){
       dmcmm_stock -= dmcmm_seq[0];
       dmcmm_seq[0]=0;
+      branch="STOCK";
    }
    if(len>0 && dmcmm_seq[0] >=1){
       int redistribute = dmcmm_seq[0];
@@ -5174,6 +5185,7 @@ void dmcmm_on_lose(){
       if(n>0){
          if(redistribute < n){
             dmcmm_seq[1]+=redistribute;
+            branch+=" RLT";
          } else {
             int r = total % n;
             int avg = total / n;
@@ -5183,9 +5195,11 @@ void dmcmm_on_lose(){
             for(int i=0;i<newLen;i++) dmcmm_seq[i]+=avg;
             if(r>0) dmcmm_seq[0]+=r;
             dmcmm_array_insert(dmcmm_seq,0,0);
+            branch += (r>0) ? " RGE" : " RG";
          }
       }
    }
+   dmcmm_log(2, StringFormat("lose(%s) seq=[%s] stock=%d streak=%d", branch, dmcmm_seq_to_string(), dmcmm_stock, dmcmm_streak));
 }
 
 void dmcmm_process_history(string symbol,int magic){
@@ -5215,7 +5229,7 @@ void dmcmm_process_history(string symbol,int magic){
             if(win) dmcmm_on_win(); else dmcmm_on_lose();
             dmcmm_lastTicket=ticket;
             dmcmm_save(symbol,magic);
-            dmcmm_log(StringFormat("ticket=%I64u result=%s",ticket,win?"WIN":"LOSE"));
+            dmcmm_log(1, StringFormat("ticket=%I64u result=%s seq=[%s] stock=%d streak=%d",ticket,win?"WIN":"LOSE",dmcmm_seq_to_string(),dmcmm_stock,dmcmm_streak));
          }
       }
    }
@@ -5231,7 +5245,7 @@ double dmcmm_calc_lot(string symbol,int magic){
    else if(dmcmm_streak==4) mult=3;
    else if(dmcmm_streak>=5) mult=5;
    double lot = bet * DMCMM_BaseLot * mult;
-   dmcmm_log(StringFormat("seq=[%s], stock=%d, streak=%d, bet=%d, mult=%d, lot=%g", dmcmm_seq_to_string(), dmcmm_stock, dmcmm_streak, bet, mult, lot));
+   dmcmm_log(1, StringFormat("seq=[%s], stock=%d, streak=%d, bet=%d, mult=%d, lot=%g", dmcmm_seq_to_string(), dmcmm_stock, dmcmm_streak, bet, mult, lot));
    return lot;
 }
 
@@ -5243,7 +5257,7 @@ double sqDistributedMonteCarloMM(string symbol, int orderType, double price, dou
    string sym = correctSymbol(symbol);
    double lot = dmcmm_calc_lot(sym, MagicNumberA);
    if(lot <= 0){
-      dmcmm_log("bet is zero, skipping order");
+      dmcmm_log(1, "bet is zero, skipping order");
       return(0);
    }
    lot = fixLotSize(sym, lot);
