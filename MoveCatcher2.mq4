@@ -436,7 +436,11 @@ int OnInit() {
    objMaxTradesPerDay = new CMaxTradesPerDay();
    objMinMaxSLPT = new CMinMaxSLPT();
 
-   dmcmm_load(Symbol(), MagicNumberA);
+   if(IsTesting()){
+      dmcmm_reset();
+   } else {
+      dmcmm_load(Symbol(), MagicNumberA);
+   }
 
 
    // OnInit  rules
@@ -5033,6 +5037,7 @@ void dmcmm_log(int level, string text){
 }
 
 void dmcmm_save(string symbol,int magic){
+   if(IsTesting()) return;
    if(DMCMM_PersistMode == DMCMM_PERSIST_GV){
       string base = StringFormat("DMCMM_%s_%d_", symbol, magic);
       int len = ArraySize(dmcmm_seq);
@@ -5055,6 +5060,7 @@ void dmcmm_save(string symbol,int magic){
 }
 
 void dmcmm_load(string symbol,int magic){
+   if(IsTesting()) return;
    if(DMCMM_PersistMode == DMCMM_PERSIST_GV){
       string base = StringFormat("DMCMM_%s_%d_", symbol, magic);
       if(!GlobalVariableCheck(base+"LEN")){
