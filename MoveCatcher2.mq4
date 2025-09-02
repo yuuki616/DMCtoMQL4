@@ -5041,19 +5041,23 @@ void dmcmm_save(string symbol,int magic){
    if(DMCMM_PersistMode == DMCMM_PERSIST_GV){
       string base = StringFormat("DMCMM_%s_%d_", symbol, magic);
       int len = ArraySize(dmcmm_seq);
-      double code=0;
-      for(int i=0;i<len;i++) code = code*1000 + dmcmm_seq[i];
-      GlobalVariableSet(base+"SEQ", code);
       GlobalVariableSet(base+"LEN", len);
+      for(int i=0;i<len;i++){
+         GlobalVariableSet(base+"SEQ_"+IntegerToString(i), (double)dmcmm_seq[i]);
+      }
+      // 古い余分な要素を削除
+      for(int i=len; GlobalVariableCheck(base+"SEQ_"+IntegerToString(i)); i++){
+         GlobalVariableDel(base+"SEQ_"+IntegerToString(i));
+      }
       GlobalVariableSet(base+"STOCK", (double)dmcmm_stock);
-      GlobalVariableSet(base+"STREAK", dmcmm_streak);
+      GlobalVariableSet(base+"STREAK", (double)dmcmm_streak);
       GlobalVariableSet(base+"LASTT", (double)dmcmm_lastTicket);
       GlobalVariableSet(base+"LASTC", (double)dmcmm_lastCloseTime);
    } else {
       string fname = StringFormat("DMCMM_%s_%d.csv", symbol, magic);
       int handle = FileOpen(fname, FILE_WRITE|FILE_CSV);
       if(handle!=INVALID_HANDLE){
-         FileWrite(handle, dmcmm_seq_to_string(), LongToString(dmcmm_stock), IntegerToString(dmcmm_streak), LongToString((long)dmcmm_lastTicket), IntegerToString(dmcmm_lastCloseTime));
+         FileWrite(handle, dmcmm_seq_to_string(), LongToString(dmcmm_stock), IntegerToString(dmcmm_streak), LongToString((long)dmcmm_lastTicket), LongToString((long)dmcmm_lastCloseTime));
          FileClose(handle);
       }
    }
@@ -5063,31 +5067,23 @@ void dmcmm_load(string symbol,int magic){
    if(IsTesting()) return;
    if(DMCMM_PersistMode == DMCMM_PERSIST_GV){
       string base = StringFormat("DMCMM_%s_%d_", symbol, magic);
-      // すべての必要なグローバル変数が存在するか確認し、欠落していれば初期化
-      if(!(GlobalVariableCheck(base+"SEQ") && GlobalVariableCheck(base+"LEN") &&
-           GlobalVariableCheck(base+"STOCK") && GlobalVariableCheck(base+"STREAK") &&
-           GlobalVariableCheck(base+"LASTT") && GlobalVariableCheck(base+"LASTC"))){
+      if(!(GlobalVariableCheck(base+"LEN") && GlobalVariableCheck(base+"STOCK") &&
+           GlobalVariableCheck(base+"STREAK") && GlobalVariableCheck(base+"LASTT") &&
+           GlobalVariableCheck(base+"LASTC"))){
          dmcmm_reset();
          return;
       }
       int len = (int)GlobalVariableGet(base+"LEN");
-      double code = GlobalVariableGet(base+"SEQ");
       ArrayResize(dmcmm_seq, len);
-      for(int i=len-1;i>=0;i--){
-         dmcmm_seq[i] = (long)MathMod(code,1000);
-         code = MathFloor(code/1000);
+      for(int i=0;i<len;i++){
+         string name = base+"SEQ_"+IntegerToString(i);
+         if(!GlobalVariableCheck(name)){ dmcmm_reset(); return; }
+         dmcmm_seq[i] = (long)GlobalVariableGet(name);
       }
       dmcmm_stock = (long)GlobalVariableGet(base+"STOCK");
       dmcmm_streak = (int)GlobalVariableGet(base+"STREAK");
       dmcmm_lastTicket = (ulong)GlobalVariableGet(base+"LASTT");
       dmcmm_lastCloseTime = (datetime)GlobalVariableGet(base+"LASTC");
-      // 読み込んだ数列に負の値が含まれる場合はリセット
-      for(int vi=0; vi<ArraySize(dmcmm_seq); vi++){
-         if(dmcmm_seq[vi] < 0){
-            dmcmm_reset();
-            return;
-         }
-      }
    } else {
       string fname = StringFormat("DMCMM_%s_%d.csv", symbol, magic);
       int handle = FileOpen(fname, FILE_READ|FILE_CSV);
