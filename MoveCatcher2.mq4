@@ -5188,14 +5188,12 @@ void dmcmm_on_win(){
 }
 
 void dmcmm_on_lose(){
-   if(dmcmm_streak <=5){
-      dmcmm_streak=0;
-   } else {
-      long consecutiveProfit=(dmcmm_streak-3)*5-8;
-      long normalProfit=dmcmm_streak-2;
+   if(dmcmm_streak >=6){
+      long consecutiveProfit = (dmcmm_streak-3)*5-8;
+      long normalProfit = dmcmm_streak-2;
       dmcmm_stock += (consecutiveProfit - normalProfit);
-      dmcmm_streak=0;
    }
+   dmcmm_streak = 0;
    int len = ArraySize(dmcmm_seq);
    if(len>0){
       long add = dmcmm_seq[0] + dmcmm_seq[len-1];
