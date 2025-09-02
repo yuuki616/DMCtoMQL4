@@ -5063,7 +5063,10 @@ void dmcmm_load(string symbol,int magic){
    if(IsTesting()) return;
    if(DMCMM_PersistMode == DMCMM_PERSIST_GV){
       string base = StringFormat("DMCMM_%s_%d_", symbol, magic);
-      if(!GlobalVariableCheck(base+"LEN")){
+      // すべての必要なグローバル変数が存在するか確認し、欠落していれば初期化
+      if(!(GlobalVariableCheck(base+"SEQ") && GlobalVariableCheck(base+"LEN") &&
+           GlobalVariableCheck(base+"STOCK") && GlobalVariableCheck(base+"STREAK") &&
+           GlobalVariableCheck(base+"LASTT") && GlobalVariableCheck(base+"LASTC"))){
          dmcmm_reset();
          return;
       }
@@ -5078,6 +5081,7 @@ void dmcmm_load(string symbol,int magic){
       dmcmm_streak = (int)GlobalVariableGet(base+"STREAK");
       dmcmm_lastTicket = (ulong)GlobalVariableGet(base+"LASTT");
       dmcmm_lastCloseTime = (datetime)GlobalVariableGet(base+"LASTC");
+      // 読み込んだ数列に負の値が含まれる場合はリセット
       for(int vi=0; vi<ArraySize(dmcmm_seq); vi++){
          if(dmcmm_seq[vi] < 0){
             dmcmm_reset();
