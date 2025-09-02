@@ -184,8 +184,8 @@ bool strategyUsesATM = false;
 
 double initialBalance = 0;
 
-int dmcmm_seq[];
-int dmcmm_stock = 0;
+long dmcmm_seq[];
+long dmcmm_stock = 0;
 int dmcmm_streak = 0;
 ulong dmcmm_lastTicket = 0;
 
@@ -4989,14 +4989,14 @@ class CMinMaxSLPT : public CTradingOption {
 CMinMaxSLPT* objMinMaxSLPT;
 // DMCMM - 単数列分解管理モンテカルロ法
 // Functions
-void dmcmm_array_remove(int &arr[], int index){
+void dmcmm_array_remove(long &arr[], int index){
    int size = ArraySize(arr);
    if(index < 0 || index >= size) return;
    for(int i=index; i<size-1; i++) arr[i] = arr[i+1];
    ArrayResize(arr, size-1);
 }
 
-void dmcmm_array_insert(int &arr[], int index, int value){
+void dmcmm_array_insert(long &arr[], int index, long value){
    int size = ArraySize(arr);
    ArrayResize(arr, size+1);
    for(int i=size; i>index; i--) arr[i] = arr[i-1];
@@ -5007,7 +5007,7 @@ string dmcmm_seq_to_string(){
    string s="";
    int size = ArraySize(dmcmm_seq);
    for(int i=0;i<size;i++){
-      s += IntegerToString(dmcmm_seq[i]);
+      s += LongToString(dmcmm_seq[i]);
       if(i<size-1) s += ",";
    }
    return s;
@@ -5034,14 +5034,14 @@ void dmcmm_save(string symbol,int magic){
       for(int i=0;i<len;i++) code = code*1000 + dmcmm_seq[i];
       GlobalVariableSet(base+"SEQ", code);
       GlobalVariableSet(base+"LEN", len);
-      GlobalVariableSet(base+"STOCK", dmcmm_stock);
+      GlobalVariableSet(base+"STOCK", (double)dmcmm_stock);
       GlobalVariableSet(base+"STREAK", dmcmm_streak);
       GlobalVariableSet(base+"LASTT", (double)dmcmm_lastTicket);
    } else {
       string fname = StringFormat("DMCMM_%s_%d.csv", symbol, magic);
       int handle = FileOpen(fname, FILE_WRITE|FILE_CSV);
       if(handle!=INVALID_HANDLE){
-         FileWrite(handle, dmcmm_seq_to_string(), dmcmm_stock, dmcmm_streak, (int)dmcmm_lastTicket);
+         FileWrite(handle, dmcmm_seq_to_string(), LongToString(dmcmm_stock), IntegerToString(dmcmm_streak), LongToString((long)dmcmm_lastTicket));
          FileClose(handle);
       }
    }
@@ -5058,12 +5058,18 @@ void dmcmm_load(string symbol,int magic){
       double code = GlobalVariableGet(base+"SEQ");
       ArrayResize(dmcmm_seq, len);
       for(int i=len-1;i>=0;i--){
-         dmcmm_seq[i] = (int)MathMod(code,1000);
+         dmcmm_seq[i] = (long)MathMod(code,1000);
          code = MathFloor(code/1000);
       }
-      dmcmm_stock = (int)GlobalVariableGet(base+"STOCK");
+      dmcmm_stock = (long)GlobalVariableGet(base+"STOCK");
       dmcmm_streak = (int)GlobalVariableGet(base+"STREAK");
       dmcmm_lastTicket = (ulong)GlobalVariableGet(base+"LASTT");
+      for(int vi=0; vi<ArraySize(dmcmm_seq); vi++){
+         if(dmcmm_seq[vi] < 0){
+            dmcmm_reset();
+            return;
+         }
+      }
    } else {
       string fname = StringFormat("DMCMM_%s_%d.csv", symbol, magic);
       int handle = FileOpen(fname, FILE_READ|FILE_CSV);
@@ -5072,9 +5078,9 @@ void dmcmm_load(string symbol,int magic){
          return;
       }
       string seqStr = FileReadString(handle);
-      dmcmm_stock = FileReadInteger(handle);
-      dmcmm_streak = FileReadInteger(handle);
-      dmcmm_lastTicket = (ulong)FileReadInteger(handle);
+      string stockStr = FileReadString(handle);
+      string streakStr = FileReadString(handle);
+      string lastTStr = FileReadString(handle);
       FileClose(handle);
       if(StringLen(seqStr)==0){
          dmcmm_reset();
@@ -5082,7 +5088,17 @@ void dmcmm_load(string symbol,int magic){
          string parts[];
          int n = StringSplit(seqStr, ',', parts);
          ArrayResize(dmcmm_seq, n);
-         for(int i=0;i<n;i++) dmcmm_seq[i]=(int)StrToInteger(parts[i]);
+         for(int i=0;i<n;i++) dmcmm_seq[i]=(long)StrToDouble(parts[i]);
+      }
+      dmcmm_stock = (long)StrToDouble(stockStr);
+      dmcmm_streak = (int)StrToInteger(streakStr);
+      dmcmm_lastTicket = (ulong)StrToDouble(lastTStr);
+      // validate loaded sequence
+      for(int vi=0; vi<ArraySize(dmcmm_seq); vi++){
+         if(dmcmm_seq[vi] < 0){
+            dmcmm_reset();
+            return;
+         }
       }
    }
 }
@@ -5090,12 +5106,12 @@ void dmcmm_load(string symbol,int magic){
 void dmcmm_average(){
    int len = ArraySize(dmcmm_seq);
    if(len<=0) return;
-   int sum=0;
+   long sum=0;
    for(int i=0;i<len;i++) sum+=dmcmm_seq[i];
-   int left = dmcmm_seq[0];
+   long left = dmcmm_seq[0];
    if(len-1<=0) return;
-   int A = sum % (len-1);
-   int B = sum % len;
+   long A = sum % (len-1);
+   long B = sum % len;
    string branch="";
    if(left==0){
       dmcmm_array_remove(dmcmm_seq,0);
@@ -5103,14 +5119,14 @@ void dmcmm_average(){
       if(newLen<=0) return;
       if(A==0){
          for(int i=0;i<newLen;i++) dmcmm_seq[i]=0;
-         int avg = sum/newLen;
+         long avg = sum/newLen;
          for(int i=0;i<newLen;i++) dmcmm_seq[i]+=avg;
          dmcmm_array_insert(dmcmm_seq,0,0);
          branch="L0A0";
       } else {
          for(int i=0;i<newLen;i++) dmcmm_seq[i]=0;
-         int avg = sum/newLen;
-         int rem = sum%newLen;
+         long avg = sum/newLen;
+         long rem = sum%newLen;
          for(int i=0;i<newLen;i++) dmcmm_seq[i]+=avg;
          dmcmm_seq[0]+=rem;
          dmcmm_array_insert(dmcmm_seq,0,0);
@@ -5118,7 +5134,7 @@ void dmcmm_average(){
       }
    } else {
       for(int i=0;i<len;i++) dmcmm_seq[i]=0;
-      int avg = sum/len;
+      long avg = sum/len;
       for(int i=0;i<len;i++) dmcmm_seq[i]+=avg;
       if(B>0 && len>1) dmcmm_seq[1]+=B;
       branch = (B>0 && len>1) ? "L1B1" : "L1B0";
@@ -5129,19 +5145,19 @@ void dmcmm_average(){
 void dmcmm_on_win(){
    int len = ArraySize(dmcmm_seq);
    if(len<2) return;
-   int left = dmcmm_seq[0];
-   int right = dmcmm_seq[len-1];
+   long left = dmcmm_seq[0];
+   long right = dmcmm_seq[len-1];
    if(len==2 && left==0 && right==1) dmcmm_streak++;
    string branch="";
    if(len==2){
       dmcmm_seq[0]=0; dmcmm_seq[1]=1;
       branch="LEN2";
    } else if(len==3){
-      int v = dmcmm_seq[2];
+      long v = dmcmm_seq[2];
       if(v%2==0){
-         int h=v/2; dmcmm_seq[0]=h; dmcmm_seq[1]=h; branch="LEN3E";
+         long h=v/2; dmcmm_seq[0]=h; dmcmm_seq[1]=h; branch="LEN3E";
       } else {
-         int l=v/2; int r=l+v%2; dmcmm_seq[0]=l; dmcmm_seq[1]=r; branch="LEN3O";
+         long l=v/2; long r=l+v%2; dmcmm_seq[0]=l; dmcmm_seq[1]=r; branch="LEN3O";
       }
       ArrayResize(dmcmm_seq,2);
    } else {
@@ -5150,21 +5166,21 @@ void dmcmm_on_win(){
       branch="LENM";
    }
    dmcmm_average();
-   dmcmm_log(2, StringFormat("win(%s) seq=[%s] stock=%d streak=%d", branch, dmcmm_seq_to_string(), dmcmm_stock, dmcmm_streak));
+   dmcmm_log(2, StringFormat("win(%s) seq=[%s] stock=%I64d streak=%d", branch, dmcmm_seq_to_string(), dmcmm_stock, dmcmm_streak));
 }
 
 void dmcmm_on_lose(){
    if(dmcmm_streak <=5){
       dmcmm_streak=0;
    } else {
-      int consecutiveProfit=(dmcmm_streak-3)*5-8;
-      int normalProfit=dmcmm_streak-2;
+      long consecutiveProfit=(dmcmm_streak-3)*5-8;
+      long normalProfit=dmcmm_streak-2;
       dmcmm_stock += (consecutiveProfit - normalProfit);
       dmcmm_streak=0;
    }
    int len = ArraySize(dmcmm_seq);
    if(len>0){
-      int add = dmcmm_seq[0] + dmcmm_seq[len-1];
+      long add = dmcmm_seq[0] + dmcmm_seq[len-1];
       dmcmm_array_insert(dmcmm_seq, len, add);
    }
    dmcmm_average();
@@ -5176,9 +5192,9 @@ void dmcmm_on_lose(){
       branch="STOCK";
    }
    if(len>0 && dmcmm_seq[0] >=1){
-      int redistribute = dmcmm_seq[0];
+      long redistribute = dmcmm_seq[0];
       dmcmm_seq[0]=0;
-      int total=0;
+      long total=0;
       for(int i=0;i<ArraySize(dmcmm_seq);i++) total+=dmcmm_seq[i];
       total += redistribute;
       int n = ArraySize(dmcmm_seq)-1;
@@ -5187,8 +5203,8 @@ void dmcmm_on_lose(){
             dmcmm_seq[1]+=redistribute;
             branch+=" RLT";
          } else {
-            int r = total % n;
-            int avg = total / n;
+            long r = total % n;
+            long avg = total / n;
             dmcmm_array_remove(dmcmm_seq,0);
             int newLen = ArraySize(dmcmm_seq);
             for(int i=0;i<newLen;i++) dmcmm_seq[i]=0;
@@ -5199,7 +5215,7 @@ void dmcmm_on_lose(){
          }
       }
    }
-   dmcmm_log(2, StringFormat("lose(%s) seq=[%s] stock=%d streak=%d", branch, dmcmm_seq_to_string(), dmcmm_stock, dmcmm_streak));
+   dmcmm_log(2, StringFormat("lose(%s) seq=[%s] stock=%I64d streak=%d", branch, dmcmm_seq_to_string(), dmcmm_stock, dmcmm_streak));
 }
 
 void dmcmm_process_history(string symbol,int magic){
@@ -5229,7 +5245,7 @@ void dmcmm_process_history(string symbol,int magic){
             if(win) dmcmm_on_win(); else dmcmm_on_lose();
             dmcmm_lastTicket=ticket;
             dmcmm_save(symbol,magic);
-            dmcmm_log(1, StringFormat("ticket=%I64u result=%s seq=[%s] stock=%d streak=%d",ticket,win?"WIN":"LOSE",dmcmm_seq_to_string(),dmcmm_stock,dmcmm_streak));
+            dmcmm_log(1, StringFormat("ticket=%I64u result=%s seq=[%s] stock=%I64d streak=%d",ticket,win?"WIN":"LOSE",dmcmm_seq_to_string(),dmcmm_stock,dmcmm_streak));
          }
       }
    }
@@ -5238,14 +5254,14 @@ void dmcmm_process_history(string symbol,int magic){
 double dmcmm_calc_lot(string symbol,int magic){
    dmcmm_load(symbol,magic);
    int len = ArraySize(dmcmm_seq);
-   int bet=0;
+   long bet=0;
    if(len>=2) bet = dmcmm_seq[0] + dmcmm_seq[len-1];
    int mult = 1;
    if(dmcmm_streak==3) mult=2;
    else if(dmcmm_streak==4) mult=3;
    else if(dmcmm_streak>=5) mult=5;
-   double lot = bet * DMCMM_BaseLot * mult;
-   dmcmm_log(1, StringFormat("seq=[%s], stock=%d, streak=%d, bet=%d, mult=%d, lot=%g", dmcmm_seq_to_string(), dmcmm_stock, dmcmm_streak, bet, mult, lot));
+   double lot = (double)bet * DMCMM_BaseLot * mult;
+   dmcmm_log(1, StringFormat("seq=[%s], stock=%I64d, streak=%d, bet=%I64d, mult=%d, lot=%g", dmcmm_seq_to_string(), dmcmm_stock, dmcmm_streak, bet, mult, lot));
    return lot;
 }
 
