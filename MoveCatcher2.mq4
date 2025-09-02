@@ -188,6 +188,7 @@ long dmcmm_seq[];
 long dmcmm_stock = 0;
 int dmcmm_streak = 0;
 ulong dmcmm_lastTicket = 0;
+datetime dmcmm_lastCloseTime = 0;
 
 
 const double CLOSE_ALL = -1;
@@ -5024,6 +5025,7 @@ void dmcmm_reset(){
    dmcmm_stock=0;
    dmcmm_streak=0;
    dmcmm_lastTicket=0;
+   dmcmm_lastCloseTime=0;
 }
 
 void dmcmm_log(int level, string text){
@@ -5041,11 +5043,12 @@ void dmcmm_save(string symbol,int magic){
       GlobalVariableSet(base+"STOCK", (double)dmcmm_stock);
       GlobalVariableSet(base+"STREAK", dmcmm_streak);
       GlobalVariableSet(base+"LASTT", (double)dmcmm_lastTicket);
+      GlobalVariableSet(base+"LASTC", (double)dmcmm_lastCloseTime);
    } else {
       string fname = StringFormat("DMCMM_%s_%d.csv", symbol, magic);
       int handle = FileOpen(fname, FILE_WRITE|FILE_CSV);
       if(handle!=INVALID_HANDLE){
-         FileWrite(handle, dmcmm_seq_to_string(), LongToString(dmcmm_stock), IntegerToString(dmcmm_streak), LongToString((long)dmcmm_lastTicket));
+         FileWrite(handle, dmcmm_seq_to_string(), LongToString(dmcmm_stock), IntegerToString(dmcmm_streak), LongToString((long)dmcmm_lastTicket), IntegerToString(dmcmm_lastCloseTime));
          FileClose(handle);
       }
    }
@@ -5068,6 +5071,7 @@ void dmcmm_load(string symbol,int magic){
       dmcmm_stock = (long)GlobalVariableGet(base+"STOCK");
       dmcmm_streak = (int)GlobalVariableGet(base+"STREAK");
       dmcmm_lastTicket = (ulong)GlobalVariableGet(base+"LASTT");
+      dmcmm_lastCloseTime = (datetime)GlobalVariableGet(base+"LASTC");
       for(int vi=0; vi<ArraySize(dmcmm_seq); vi++){
          if(dmcmm_seq[vi] < 0){
             dmcmm_reset();
@@ -5085,6 +5089,7 @@ void dmcmm_load(string symbol,int magic){
       string stockStr = FileReadString(handle);
       string streakStr = FileReadString(handle);
       string lastTStr = FileReadString(handle);
+      string lastCStr = FileReadString(handle);
       FileClose(handle);
       if(StringLen(seqStr)==0){
          dmcmm_reset();
@@ -5097,6 +5102,7 @@ void dmcmm_load(string symbol,int magic){
       dmcmm_stock = (long)StrToDouble(stockStr);
       dmcmm_streak = (int)StrToInteger(streakStr);
       dmcmm_lastTicket = (ulong)StrToDouble(lastTStr);
+      dmcmm_lastCloseTime = (datetime)StrToInteger(lastCStr);
       // validate loaded sequence
       for(int vi=0; vi<ArraySize(dmcmm_seq); vi++){
          if(dmcmm_seq[vi] < 0){
@@ -5226,31 +5232,46 @@ void dmcmm_process_history(string symbol,int magic){
    dmcmm_load(symbol,magic);
    int total=OrdersHistoryTotal();
    ulong tickets[];
+   datetime times[];
    ArrayResize(tickets,0);
+   ArrayResize(times,0);
    for(int i=0;i<total;i++){
       if(OrderSelect(i,SELECT_BY_POS,MODE_HISTORY)){
          if(OrderSymbol()==symbol && OrderMagicNumber()==magic && OrderCloseTime()>0){
             ulong ticket=OrderTicket();
-            if(ticket>dmcmm_lastTicket){
+            datetime closeTime=OrderCloseTime();
+            if(closeTime > dmcmm_lastCloseTime || (closeTime == dmcmm_lastCloseTime && ticket > dmcmm_lastTicket)){
                int idx=ArraySize(tickets);
                ArrayResize(tickets,idx+1);
+               ArrayResize(times,idx+1);
                tickets[idx]=ticket;
+               times[idx]=closeTime;
             }
          }
       }
    }
-   if(ArraySize(tickets)>0){
-      ArraySort(tickets,WHOLE_ARRAY,0,MODE_ASCEND);
-      for(int j=0;j<ArraySize(tickets);j++){
-         ulong ticket=tickets[j];
-         if(OrderSelect((int)ticket,SELECT_BY_TICKET)){
-            double pl=OrderProfit()+OrderSwap()+OrderCommission();
-            bool win=(pl >= DMCMM_WinEpsMoney);
-            if(win) dmcmm_on_win(); else dmcmm_on_lose();
-            dmcmm_lastTicket=ticket;
-            dmcmm_save(symbol,magic);
-            dmcmm_log(1, StringFormat("ticket=%I64u result=%s seq=[%s] stock=%I64d streak=%d",ticket,win?"WIN":"LOSE",dmcmm_seq_to_string(),dmcmm_stock,dmcmm_streak));
+   int count=ArraySize(tickets);
+   if(count>1){
+      for(int i=0;i<count-1;i++){
+         for(int j=i+1;j<count;j++){
+            if(times[i] > times[j] || (times[i]==times[j] && tickets[i]>tickets[j])){
+               datetime t=times[i]; times[i]=times[j]; times[j]=t;
+               ulong tk=tickets[i]; tickets[i]=tickets[j]; tickets[j]=tk;
+            }
          }
+      }
+   }
+   for(int j=0;j<count;j++){
+      ulong ticket=tickets[j];
+      if(OrderSelect((int)ticket,SELECT_BY_TICKET)){
+         datetime closeTime=OrderCloseTime();
+         double pl=OrderProfit()+OrderSwap()+OrderCommission();
+         bool win=(pl >= DMCMM_WinEpsMoney);
+         if(win) dmcmm_on_win(); else dmcmm_on_lose();
+         dmcmm_lastTicket=ticket;
+         dmcmm_lastCloseTime=closeTime;
+         dmcmm_save(symbol,magic);
+         dmcmm_log(1, StringFormat("ticket=%I64u result=%s seq=[%s] stock=%I64d streak=%d",ticket,win?"WIN":"LOSE",dmcmm_seq_to_string(),dmcmm_stock,dmcmm_streak));
       }
    }
 }
