@@ -5007,7 +5007,7 @@ string dmcmm_seq_to_string(){
    string s="";
    int size = ArraySize(dmcmm_seq);
    for(int i=0;i<size;i++){
-      s += LongToString(dmcmm_seq[i]);
+      s += LongToStr(dmcmm_seq[i]);
       if(i<size-1) s += ",";
    }
    return s;
@@ -5041,7 +5041,7 @@ void dmcmm_save(string symbol,int magic){
       string fname = StringFormat("DMCMM_%s_%d.csv", symbol, magic);
       int handle = FileOpen(fname, FILE_WRITE|FILE_CSV);
       if(handle!=INVALID_HANDLE){
-         FileWrite(handle, dmcmm_seq_to_string(), LongToString(dmcmm_stock), IntegerToString(dmcmm_streak), LongToString((long)dmcmm_lastTicket));
+         FileWrite(handle, dmcmm_seq_to_string(), LongToStr(dmcmm_stock), IntegerToString(dmcmm_streak), LongToStr((long)dmcmm_lastTicket));
          FileClose(handle);
       }
    }
