@@ -5223,7 +5223,7 @@ void dmcmm_process_history(string symbol,int magic){
       ArraySort(tickets,WHOLE_ARRAY,0,MODE_ASCEND);
       for(int j=0;j<ArraySize(tickets);j++){
          ulong ticket=tickets[j];
-         if(OrderSelect(ticket,SELECT_BY_TICKET)){
+         if(OrderSelect((int)ticket,SELECT_BY_TICKET)){
             double pl=OrderProfit()+OrderSwap()+OrderCommission();
             bool win=(pl >= DMCMM_WinEpsMoney);
             if(win) dmcmm_on_win(); else dmcmm_on_lose();
