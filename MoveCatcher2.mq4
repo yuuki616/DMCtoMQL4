@@ -5302,6 +5302,8 @@ double sqDistributedMonteCarloMM(string symbol, int orderType, double price, dou
       return (mmLotsIfNoMM);
    }
    string sym = correctSymbol(symbol);
+   // 最新の勝敗結果を反映してからロットを算出する
+   dmcmm_process_history(sym, MagicNumberA);
    double lot = dmcmm_calc_lot(sym, MagicNumberA);
    if(lot <= 0){
       dmcmm_log(1, "bet is zero, skipping order");
