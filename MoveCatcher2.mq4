@@ -147,7 +147,7 @@ int sqMaxCloseSlippage = 0;          //Max tolerated close slippage in pips. Zer
 bool autoCorrectMaxSlippage = true;  //If set to true, it will automatically adjust max slippage according to symbol digits (*10 for 3 and 5 digit symbols)  
 
 //Some brokers have problems with updating position counts. Set this timeout to non-zero value if you experience this.
-//For example EnterReverseAtMarket doesn't work well for Admiral Markets, because OrdersTotal() returns 1 even after the order has been closed.
+//For example, some brokers may report OrdersTotal() = 1 even after the order has been closed.
 uint orderSelectTimeout = 0;         //in ms
 
 double sqMinDistance = 0;
