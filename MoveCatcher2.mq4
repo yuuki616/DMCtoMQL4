@@ -224,17 +224,20 @@ void OnTick() {
        );
 
       // Action #2
-         _ticket = sqOpenOrder(OP_BUY, "Current", sqDistributedMonteCarloMM("Current",OP_BUY,0,sqGetSLLevel("Current", OP_BUY, 0, 1, SLTP),mmRiskPercent,mmDecimals,mmStopLossPips,mmLotsIfNoMM,mmMaxLots,mmMultiplier,mmStep), 0, MagicNumberA, "1", 0, false, false, CLR_NONE);
+      double sl = sqGetSLLevel("Current", OP_BUY, 0, 1, SLTP);
+      double lot = sqDistributedMonteCarloMM("Current",OP_BUY,0,sl,mmRiskPercent,mmDecimals,mmStopLossPips,mmLotsIfNoMM,mmMaxLots,mmMultiplier,mmStep);
+      if(lot > 0){
+         _ticket = sqOpenOrder(OP_BUY, "Current", lot, 0, MagicNumberA, "1", 0, false, false, CLR_NONE);
 
       if(_ticket > 0 && OrderSelect(_ticket, SELECT_BY_TICKET)) {
          // set or initialize all order exit methods (SL, PT, Trailing Stop, Exit After Bars, etc.)
          // StopLoss & ProfitTarget
-         sqSetSLandPT(_ticket, sqGetSLLevel("Current", OP_BUY, 0, 1, SLTP), sqGetPTLevel("Current", OP_BUY, 0, 1, SLTP));
+         sqSetSLandPT(_ticket, sl, sqGetPTLevel("Current", OP_BUY, 0, 1, SLTP));
 
          // TrailingStop initialization
          sqSetGlobalVariable(_ticket, "TrailingStop", sqStringHash("0"));
          sqSetGlobalVariable(_ticket, "TrailingStopType", SLPTTYPE_LEVEL);
-      }
+      }}
 
 
       // Action #3
@@ -249,15 +252,18 @@ void OnTick() {
    if ((FirstTrade
       && (sqGetAsk("Current") <= (sqGetOrderOpenPrice("Current", MagicNumberA, 0, "") - PosDisPrice))))
    {
-      // Action #1
-         _ticket = sqOpenOrder(OP_BUY, "Current", sqDistributedMonteCarloMM("Current",OP_BUY,0,sqGetSLLevel("Current", OP_BUY, 0, 1, SLTP),mmRiskPercent,mmDecimals,mmStopLossPips,mmLotsIfNoMM,mmMaxLots,mmMultiplier,mmStep), 0, MagicNumberA, "2L", 0, false, false, CLR_NONE);
+        // Action #1
+        double sl2 = sqGetSLLevel("Current", OP_BUY, 0, 1, SLTP);
+        double lot2 = sqDistributedMonteCarloMM("Current",OP_BUY,0,sl2,mmRiskPercent,mmDecimals,mmStopLossPips,mmLotsIfNoMM,mmMaxLots,mmMultiplier,mmStep);
+        if(lot2 > 0){
+           _ticket = sqOpenOrder(OP_BUY, "Current", lot2, 0, MagicNumberA, "2L", 0, false, false, CLR_NONE);
 
-      if(_ticket > 0 && OrderSelect(_ticket, SELECT_BY_TICKET)) {
-         // set or initialize all order exit methods (SL, PT, Trailing Stop, Exit After Bars, etc.)
-         // StopLoss & ProfitTarget
-         sqSetSLandPT(_ticket, sqGetSLLevel("Current", OP_BUY, 0, 1, SLTP), sqGetPTLevel("Current", OP_BUY, 0, 1, SLTP));
+        if(_ticket > 0 && OrderSelect(_ticket, SELECT_BY_TICKET)) {
+           // set or initialize all order exit methods (SL, PT, Trailing Stop, Exit After Bars, etc.)
+           // StopLoss & ProfitTarget
+           sqSetSLandPT(_ticket, sl2, sqGetPTLevel("Current", OP_BUY, 0, 1, SLTP));
 
-      }
+        }}
 
 
       // Action #2
@@ -272,15 +278,18 @@ void OnTick() {
    if ((FirstTrade
       && (sqGetBid("Current") >= (sqGetOrderOpenPrice("Current", MagicNumberA, 0, "") + PosDisPrice))))
    {
-      // Action #1
-         _ticket = sqOpenOrder(OP_SELL, "Current", sqDistributedMonteCarloMM("Current",OP_SELL,0,sqGetSLLevel("Current", OP_SELL, 0, 1, SLTP),mmRiskPercent,mmDecimals,mmStopLossPips,mmLotsIfNoMM,mmMaxLots,mmMultiplier,mmStep), 0, MagicNumberA, "2S", 0, false, false, CLR_NONE);
+        // Action #1
+        double sl3 = sqGetSLLevel("Current", OP_SELL, 0, 1, SLTP);
+        double lot3 = sqDistributedMonteCarloMM("Current",OP_SELL,0,sl3,mmRiskPercent,mmDecimals,mmStopLossPips,mmLotsIfNoMM,mmMaxLots,mmMultiplier,mmStep);
+        if(lot3 > 0){
+           _ticket = sqOpenOrder(OP_SELL, "Current", lot3, 0, MagicNumberA, "2S", 0, false, false, CLR_NONE);
 
-      if(_ticket > 0 && OrderSelect(_ticket, SELECT_BY_TICKET)) {
-         // set or initialize all order exit methods (SL, PT, Trailing Stop, Exit After Bars, etc.)
-         // StopLoss & ProfitTarget
-         sqSetSLandPT(_ticket, sqGetSLLevel("Current", OP_SELL, 0, 1, SLTP), sqGetPTLevel("Current", OP_SELL, 0, 1, SLTP));
+        if(_ticket > 0 && OrderSelect(_ticket, SELECT_BY_TICKET)) {
+           // set or initialize all order exit methods (SL, PT, Trailing Stop, Exit After Bars, etc.)
+           // StopLoss & ProfitTarget
+           sqSetSLandPT(_ticket, sl3, sqGetPTLevel("Current", OP_SELL, 0, 1, SLTP));
 
-      }
+        }}
 
 
       // Action #2
@@ -296,15 +305,18 @@ void OnTick() {
       && (sqGetClosedPLInPips("Current", MagicNumberA, 1, "", 0) > 0))
       && (MathAbs((sqGetBid("Current") - (sqGetOrderOpenPrice("Current", MagicNumberA, 0, "") - PosDisPrice))) <= sqConvertToRealPips("Current", EntryTol))))
    {
-      // Action #1
-         _ticket = sqOpenOrder(OP_SELL, "Current", sqDistributedMonteCarloMM("Current",OP_SELL,0,sqGetSLLevel("Current", OP_SELL, 0, 1, SLTP),mmRiskPercent,mmDecimals,mmStopLossPips,mmLotsIfNoMM,mmMaxLots,mmMultiplier,mmStep), 0, MagicNumberA, "LT", 0, false, false, CLR_NONE);
+        // Action #1
+        double sl4 = sqGetSLLevel("Current", OP_SELL, 0, 1, SLTP);
+        double lot4 = sqDistributedMonteCarloMM("Current",OP_SELL,0,sl4,mmRiskPercent,mmDecimals,mmStopLossPips,mmLotsIfNoMM,mmMaxLots,mmMultiplier,mmStep);
+        if(lot4 > 0){
+           _ticket = sqOpenOrder(OP_SELL, "Current", lot4, 0, MagicNumberA, "LT", 0, false, false, CLR_NONE);
 
-      if(_ticket > 0 && OrderSelect(_ticket, SELECT_BY_TICKET)) {
-         // set or initialize all order exit methods (SL, PT, Trailing Stop, Exit After Bars, etc.)
-         // StopLoss & ProfitTarget
-         sqSetSLandPT(_ticket, sqGetSLLevel("Current", OP_SELL, 0, 1, SLTP), sqGetPTLevel("Current", OP_SELL, 0, 1, SLTP));
+        if(_ticket > 0 && OrderSelect(_ticket, SELECT_BY_TICKET)) {
+           // set or initialize all order exit methods (SL, PT, Trailing Stop, Exit After Bars, etc.)
+           // StopLoss & ProfitTarget
+           sqSetSLandPT(_ticket, sl4, sqGetPTLevel("Current", OP_SELL, 0, 1, SLTP));
 
-      }
+        }}
 
 
   }
@@ -317,15 +329,18 @@ void OnTick() {
       && (sqGetClosedPLInPips("Current", MagicNumberA, 1, "", 0) < 0))
       && (MathAbs((sqGetAsk("Current") - (sqGetOrderOpenPrice("Current", MagicNumberA, 0, "") - PosDisPrice))) <= sqConvertToRealPips("Current", EntryTol))))
    {
-      // Action #1
-         _ticket = sqOpenOrder(OP_BUY, "Current", sqDistributedMonteCarloMM("Current",OP_BUY,0,sqGetSLLevel("Current", OP_BUY, 0, 1, SLTP),mmRiskPercent,mmDecimals,mmStopLossPips,mmLotsIfNoMM,mmMaxLots,mmMultiplier,mmStep), 0, MagicNumberA, "LS", 0, false, false, CLR_NONE);
+        // Action #1
+        double sl5 = sqGetSLLevel("Current", OP_BUY, 0, 1, SLTP);
+        double lot5 = sqDistributedMonteCarloMM("Current",OP_BUY,0,sl5,mmRiskPercent,mmDecimals,mmStopLossPips,mmLotsIfNoMM,mmMaxLots,mmMultiplier,mmStep);
+        if(lot5 > 0){
+           _ticket = sqOpenOrder(OP_BUY, "Current", lot5, 0, MagicNumberA, "LS", 0, false, false, CLR_NONE);
 
-      if(_ticket > 0 && OrderSelect(_ticket, SELECT_BY_TICKET)) {
-         // set or initialize all order exit methods (SL, PT, Trailing Stop, Exit After Bars, etc.)
-         // StopLoss & ProfitTarget
-         sqSetSLandPT(_ticket, sqGetSLLevel("Current", OP_BUY, 0, 1, SLTP), sqGetPTLevel("Current", OP_BUY, 0, 1, SLTP));
+        if(_ticket > 0 && OrderSelect(_ticket, SELECT_BY_TICKET)) {
+           // set or initialize all order exit methods (SL, PT, Trailing Stop, Exit After Bars, etc.)
+           // StopLoss & ProfitTarget
+           sqSetSLandPT(_ticket, sl5, sqGetPTLevel("Current", OP_BUY, 0, 1, SLTP));
 
-      }
+        }}
 
 
   }
@@ -338,15 +353,18 @@ void OnTick() {
       && (sqGetClosedPLInPips("Current", MagicNumberA, -1, "", 0) > 0))
       && (MathAbs((sqGetAsk("Current") - (sqGetOrderOpenPrice("Current", MagicNumberA, 0, "") - PosDisPrice))) <= sqConvertToRealPips("Current", EntryTol))))
    {
-      // Action #1
-         _ticket = sqOpenOrder(OP_BUY, "Current", sqDistributedMonteCarloMM("Current",OP_BUY,0,sqGetSLLevel("Current", OP_BUY, 0, 1, SLTP),mmRiskPercent,mmDecimals,mmStopLossPips,mmLotsIfNoMM,mmMaxLots,mmMultiplier,mmStep), 0, MagicNumberA, "ST", 0, false, false, CLR_NONE);
+        // Action #1
+        double sl6 = sqGetSLLevel("Current", OP_BUY, 0, 1, SLTP);
+        double lot6 = sqDistributedMonteCarloMM("Current",OP_BUY,0,sl6,mmRiskPercent,mmDecimals,mmStopLossPips,mmLotsIfNoMM,mmMaxLots,mmMultiplier,mmStep);
+        if(lot6 > 0){
+           _ticket = sqOpenOrder(OP_BUY, "Current", lot6, 0, MagicNumberA, "ST", 0, false, false, CLR_NONE);
 
-      if(_ticket > 0 && OrderSelect(_ticket, SELECT_BY_TICKET)) {
-         // set or initialize all order exit methods (SL, PT, Trailing Stop, Exit After Bars, etc.)
-         // StopLoss & ProfitTarget
-         sqSetSLandPT(_ticket, sqGetSLLevel("Current", OP_BUY, 0, 1, SLTP), sqGetPTLevel("Current", OP_BUY, 0, 1, SLTP));
+        if(_ticket > 0 && OrderSelect(_ticket, SELECT_BY_TICKET)) {
+           // set or initialize all order exit methods (SL, PT, Trailing Stop, Exit After Bars, etc.)
+           // StopLoss & ProfitTarget
+           sqSetSLandPT(_ticket, sl6, sqGetPTLevel("Current", OP_BUY, 0, 1, SLTP));
 
-      }
+        }}
 
 
   }
@@ -359,15 +377,18 @@ void OnTick() {
       && (sqGetClosedPLInPips("Current", MagicNumberA, -1, "", 0) < 0))
       && (MathAbs((sqGetAsk("Current") - (sqGetOrderOpenPrice("Current", MagicNumberA, 0, "") - PosDisPrice))) <= sqConvertToRealPips("Current", EntryTol))))
    {
-      // Action #1
-         _ticket = sqOpenOrder(OP_SELL, "Current", sqDistributedMonteCarloMM("Current",OP_SELL,0,sqGetSLLevel("Current", OP_SELL, 0, 1, SLTP),mmRiskPercent,mmDecimals,mmStopLossPips,mmLotsIfNoMM,mmMaxLots,mmMultiplier,mmStep), 0, MagicNumberA, "SS", 0, false, false, CLR_NONE);
+        // Action #1
+        double sl7 = sqGetSLLevel("Current", OP_SELL, 0, 1, SLTP);
+        double lot7 = sqDistributedMonteCarloMM("Current",OP_SELL,0,sl7,mmRiskPercent,mmDecimals,mmStopLossPips,mmLotsIfNoMM,mmMaxLots,mmMultiplier,mmStep);
+        if(lot7 > 0){
+           _ticket = sqOpenOrder(OP_SELL, "Current", lot7, 0, MagicNumberA, "SS", 0, false, false, CLR_NONE);
 
-      if(_ticket > 0 && OrderSelect(_ticket, SELECT_BY_TICKET)) {
-         // set or initialize all order exit methods (SL, PT, Trailing Stop, Exit After Bars, etc.)
-         // StopLoss & ProfitTarget
-         sqSetSLandPT(_ticket, sqGetSLLevel("Current", OP_SELL, 0, 1, SLTP), sqGetPTLevel("Current", OP_SELL, 0, 1, SLTP));
+        if(_ticket > 0 && OrderSelect(_ticket, SELECT_BY_TICKET)) {
+           // set or initialize all order exit methods (SL, PT, Trailing Stop, Exit After Bars, etc.)
+           // StopLoss & ProfitTarget
+           sqSetSLandPT(_ticket, sl7, sqGetPTLevel("Current", OP_SELL, 0, 1, SLTP));
 
-      }
+        }}
 
 
   }
