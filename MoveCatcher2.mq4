@@ -5133,10 +5133,10 @@ void dmcmm_average(){
       int n = len-1;
       if(n<=0) return;
 
-      // 左端を取り除いてから平均化
-      dmcmm_array_remove(dmcmm_seq,0);
+      // 平均値と余剰を算出してから左端を削除
       long A = sum % (long)n;
       long avg = sum / (long)n;
+      dmcmm_array_remove(dmcmm_seq,0);
       for(int i=0;i<n;i++) dmcmm_seq[i] = avg;
       if(A>0) dmcmm_seq[0] += A;
       dmcmm_array_insert(dmcmm_seq,0,0);
