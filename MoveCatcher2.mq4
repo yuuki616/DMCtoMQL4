@@ -5218,9 +5218,8 @@ void dmcmm_on_lose(){
       int size = ArraySize(dmcmm_seq);
       int n = size - 1;
       // 合計は先頭0化後の合計に再配布値を足して算出（ダブルカウント防止）
-      long total = 0;
-      for(int i=0; i<size; i++) total += dmcmm_seq[i];
-      total += redistribute;
+      long total = redistribute;
+      for(int i=1; i<size; i++) total += dmcmm_seq[i];
       if(n>0){
          if(redistribute < n){
             if(size > 1) dmcmm_seq[1] += redistribute;
