@@ -5205,14 +5205,14 @@ void dmcmm_on_lose(){
    if(len>0 && dmcmm_seq[0] >=1){
       long redistribute = dmcmm_seq[0];
       dmcmm_seq[0] = 0;
+      int size = ArraySize(dmcmm_seq);
+      int n = size - 1;
       // 合計は先頭を0化した後の合計に再配布値を足して算出
-      long total = 0;
-      for(int i=0; i<ArraySize(dmcmm_seq); i++) total += dmcmm_seq[i];
-      total += redistribute;
-      int n = ArraySize(dmcmm_seq) - 1;
+      long total = redistribute;
+      for(int i=1; i<size; i++) total += dmcmm_seq[i];
       if(n>0){
          if(redistribute < n){
-            if(ArraySize(dmcmm_seq) > 1) dmcmm_seq[1] += redistribute;
+            if(size > 1) dmcmm_seq[1] += redistribute;
             branch += " RLT";
          } else {
             long avg = total / (long)n;
@@ -5268,7 +5268,7 @@ void dmcmm_process_history(string symbol,int magic){
    }
    for(int j=0;j<count;j++){
       ulong ticket=tickets[j];
-      if(OrderSelect((int)ticket,SELECT_BY_TICKET)){
+      if(OrderSelect((int)ticket,SELECT_BY_TICKET,MODE_HISTORY)){
          datetime closeTime=OrderCloseTime();
          double pl=OrderProfit()+OrderSwap()+OrderCommission();
          bool win=(pl >= DMCMM_WinEpsMoney);
