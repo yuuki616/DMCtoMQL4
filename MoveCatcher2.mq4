@@ -5122,30 +5122,33 @@ void dmcmm_load(string symbol,int magic){
 void dmcmm_average(){
    int len = ArraySize(dmcmm_seq);
    if(len<=0) return;
-   long sum=0;
-   for(int i=0;i<len;i++) sum+=dmcmm_seq[i];
+
+   long sum = 0;
+   for(int i=0;i<len;i++) sum += dmcmm_seq[i];
+
    long left = dmcmm_seq[0];
-   if(len-1<=0) return;
-   long A = sum % (long)(len-1);
-   long B = sum % (long)len;
    string branch="";
+
    if(left==0){
+      int n = len-1;
+      if(n<=0) return;
+
+      // 左端を取り除いてから平均化
       dmcmm_array_remove(dmcmm_seq,0);
-      int newLen = ArraySize(dmcmm_seq);
-      if(newLen<=0) return;
-      for(int i=0;i<newLen;i++) dmcmm_seq[i]=0;
-      long avg = sum / (long)newLen;
-      for(int i=0;i<newLen;i++) dmcmm_seq[i]+=avg;
-      if(A>0) dmcmm_seq[0]+=A;
+      long A = sum % (long)n;
+      long avg = sum / (long)n;
+      for(int i=0;i<n;i++) dmcmm_seq[i] = avg;
+      if(A>0) dmcmm_seq[0] += A;
       dmcmm_array_insert(dmcmm_seq,0,0);
       branch = (A>0) ? "L0A1" : "L0A0";
    } else {
-      for(int i=0;i<len;i++) dmcmm_seq[i]=0;
+      long B = sum % (long)len;
       long avg = sum / (long)len;
-      for(int i=0;i<len;i++) dmcmm_seq[i]+=avg;
-      if(B>0 && len>1) dmcmm_seq[1]+=B;
+      for(int i=0;i<len;i++) dmcmm_seq[i] = avg;
+      if(B>0 && len>1) dmcmm_seq[1] += B;
       branch = (B>0 && len>1) ? "L1B1" : "L1B0";
    }
+
    dmcmm_log(2, StringFormat("average(%s) seq=[%s]", branch, dmcmm_seq_to_string()));
 }
 
@@ -5193,7 +5196,7 @@ void dmcmm_on_lose(){
    dmcmm_average();
    len = ArraySize(dmcmm_seq);
    string branch="";
-   if(len>0 && dmcmm_seq[0] > 0 && dmcmm_seq[0] <= dmcmm_stock){
+   if(len>0 && dmcmm_seq[0] <= dmcmm_stock){
       dmcmm_stock -= dmcmm_seq[0];
       dmcmm_seq[0]=0;
       branch="STOCK";
