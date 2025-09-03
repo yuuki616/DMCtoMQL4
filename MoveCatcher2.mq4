@@ -5137,7 +5137,7 @@ void dmcmm_average(){
          return;
       }
       long rem = total % (long)n;
-      long avg = total / (long)n;
+      long avg = (total - rem) / (long)n;  // 整数平均（端数切捨て）
       dmcmm_array_remove(dmcmm_seq,0);
       for(int i = 0; i < n; i++) dmcmm_seq[i] = avg;
       if(rem > 0) dmcmm_seq[0] += rem;
@@ -5146,7 +5146,7 @@ void dmcmm_average(){
    } else {
       int n = len;
       long rem = total % (long)n;
-      long avg = total / (long)n;
+      long avg = (total - rem) / (long)n;  // 整数平均（端数切捨て）
       for(int i = 0; i < n; i++) dmcmm_seq[i] = avg;
       if(rem > 0 && n > 1) dmcmm_seq[1] += rem;
       branch = (rem > 0 && n > 1) ? "L1B1" : "L1B0";
