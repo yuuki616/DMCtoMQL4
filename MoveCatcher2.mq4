@@ -5126,22 +5126,22 @@ void dmcmm_average(){
    for(int i=0;i<len;i++) sum+=dmcmm_seq[i];
    long left = dmcmm_seq[0];
    if(len-1<=0) return;
-   long A = sum % (len-1);
-   long B = sum % len;
+   long A = sum % (long)(len-1);
+   long B = sum % (long)len;
    string branch="";
    if(left==0){
       dmcmm_array_remove(dmcmm_seq,0);
       int newLen = ArraySize(dmcmm_seq);
       if(newLen<=0) return;
       for(int i=0;i<newLen;i++) dmcmm_seq[i]=0;
-      long avg = sum/newLen;
+      long avg = sum / (long)newLen;
       for(int i=0;i<newLen;i++) dmcmm_seq[i]+=avg;
       if(A>0) dmcmm_seq[0]+=A;
       dmcmm_array_insert(dmcmm_seq,0,0);
       branch = (A>0) ? "L0A1" : "L0A0";
    } else {
       for(int i=0;i<len;i++) dmcmm_seq[i]=0;
-      long avg = sum/len;
+      long avg = sum / (long)len;
       for(int i=0;i<len;i++) dmcmm_seq[i]+=avg;
       if(B>0 && len>1) dmcmm_seq[1]+=B;
       branch = (B>0 && len>1) ? "L1B1" : "L1B0";
@@ -5210,8 +5210,8 @@ void dmcmm_on_lose(){
             if(ArraySize(dmcmm_seq)>1) dmcmm_seq[1]+=redistribute;
             branch+=" RLT";
          } else {
-            long avg = total / n;
-            long rem = total % n;
+            long avg = total / (long)n;
+            long rem = total % (long)n;
             dmcmm_array_remove(dmcmm_seq,0);
             int newLen = ArraySize(dmcmm_seq);
             for(int i=0;i<newLen;i++) dmcmm_seq[i]=avg;
