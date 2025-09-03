@@ -5193,11 +5193,11 @@ void dmcmm_on_lose(){
    }
    dmcmm_streak = 0;
    int len = ArraySize(dmcmm_seq);
-   // 数列個数が2以上のときのみ末尾に（左+右）を追加する
-   if(len>=2){
-      long add = dmcmm_seq[0] + dmcmm_seq[len-1];
-      dmcmm_array_insert(dmcmm_seq, len, add);
-   }
+   // 数列個数に関わらず末尾に（左+右）を追加する（仕様準拠）
+   long left = (len>0) ? dmcmm_seq[0] : 0;
+   long right = (len>0) ? dmcmm_seq[len-1] : 0;
+   long add = left + right;
+   dmcmm_array_insert(dmcmm_seq, len, add);
    dmcmm_average();
    len = ArraySize(dmcmm_seq);
    string branch="";
