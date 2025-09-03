@@ -5165,8 +5165,8 @@ void dmcmm_on_win(){
    } else if(len==3){
       // 初期数列から1番目と2番目を削除し、残った値を分解
       dmcmm_array_remove(dmcmm_seq,0);      // 1番目を削除
-      dmcmm_array_remove(dmcmm_seq,1);      // 2番目（元の3番目）を削除
-      long v = dmcmm_seq[0];                // 残った中間値
+      dmcmm_array_remove(dmcmm_seq,0);      // 2番目（元の2番目）を削除
+      long v = dmcmm_seq[0];                // 残った末尾値
       ArrayResize(dmcmm_seq,2);
       if(v%2==0){
          long h=v/2; dmcmm_seq[0]=h; dmcmm_seq[1]=h; branch="LEN3E";
