@@ -5214,7 +5214,7 @@ void dmcmm_on_lose(){
       int n = size - 1;
       // 合計数列値 = （先頭0化後の合計）＋再配布値（仕様準拠）
       long sumZero = 0;
-      for(int i = 0; i < size; i++) sumZero += dmcmm_seq[i];
+      for(int i = 1; i < size; i++) sumZero += dmcmm_seq[i];
       long total = sumZero + redistribute;
       if(n <= 0){
          branch += " R0";
