@@ -5121,41 +5121,35 @@ void dmcmm_load(string symbol,int magic){
 
 void dmcmm_average(){
    int len = ArraySize(dmcmm_seq);
-   if(len<=0) return;
+   if(len <= 0) return;
 
+   // 事前に合計を算出して仕様と同じ分岐条件を得る
+   long sum = 0;
+   for(int i = 0; i < len; i++) sum += dmcmm_seq[i];
    long left = dmcmm_seq[0];
-   string branch="";
+   string branch = "";
 
-   if(left==0){
-      // 仕様通り先に左端を削除してから合計と平均を計算
-      dmcmm_array_remove(dmcmm_seq,0);
-      int n = ArraySize(dmcmm_seq);
-      if(n<=0){
-         dmcmm_array_insert(dmcmm_seq,0,0);
+   if(left == 0){
+      int n = len - 1;
+      if(n <= 0){
+         dmcmm_seq[0] = 0;
          dmcmm_log(2, StringFormat("average(%s) seq=[%s]", "L0EMP", dmcmm_seq_to_string()));
          return;
       }
-      long sum = 0;
-      for(int i=0;i<n;i++) sum += dmcmm_seq[i];
       long A = sum % (long)n;
-      long avg = sum / (long)n;
-      // 一旦0化してから平均値を再配布
-      for(int i=0;i<n;i++) dmcmm_seq[i] = 0;
-      for(int i=0;i<n;i++) dmcmm_seq[i] += avg;
-      if(A>0) dmcmm_seq[0] += A;
+      long avg = (sum - A) / (long)n;
+      dmcmm_array_remove(dmcmm_seq,0);
+      for(int i = 0; i < n; i++) dmcmm_seq[i] = avg;
+      if(A > 0) dmcmm_seq[0] += A;
       dmcmm_array_insert(dmcmm_seq,0,0);
-      branch = (A>0) ? "L0A1" : "L0A0";
+      branch = (A > 0) ? "L0A1" : "L0A0";
    } else {
       int n = len;
-      long sum = 0;
-      for(int i=0;i<n;i++) sum += dmcmm_seq[i];
       long B = sum % (long)n;
-      long avg = sum / (long)n;
-      // 一旦0化してから平均値を再配布
-      for(int i=0;i<n;i++) dmcmm_seq[i] = 0;
-      for(int i=0;i<n;i++) dmcmm_seq[i] += avg;
-      if(B>0 && n>1) dmcmm_seq[1] += B;
-      branch = (B>0 && n>1) ? "L1B1" : "L1B0";
+      long avg = (sum - B) / (long)n;
+      for(int i = 0; i < n; i++) dmcmm_seq[i] = avg;
+      if(B > 0 && n > 1) dmcmm_seq[1] += B;
+      branch = (B > 0 && n > 1) ? "L1B1" : "L1B0";
    }
 
    dmcmm_log(2, StringFormat("average(%s) seq=[%s]", branch, dmcmm_seq_to_string()));
@@ -5209,32 +5203,28 @@ void dmcmm_on_lose(){
    string branch="";
    if(len>0 && dmcmm_seq[0] <= dmcmm_stock){
       dmcmm_stock -= dmcmm_seq[0];
-      dmcmm_seq[0]=0;
-      branch="STOCK";
+      dmcmm_seq[0] = 0;
+      branch = "STOCK";
    }
-   if(len>0 && dmcmm_seq[0] >=1){
+   if(len>0 && dmcmm_seq[0] >= 1){
       long redistribute = dmcmm_seq[0];
       dmcmm_seq[0] = 0;
       int size = ArraySize(dmcmm_seq);
       int n = size - 1;
-      // 先頭を0化した後の合計に再配布値を足して合計数列値を算出（仕様準拠）
-      long total = 0;
-      for(int i=0; i<size; i++) total += dmcmm_seq[i];
-      total += redistribute;
+      // 合計数列値 = 現行の合計(先頭0化後) + 再配布値
+      long total = redistribute;
+      for(int i = 1; i < size; i++) total += dmcmm_seq[i];
       if(n <= 0){
-         // 再配布対象が存在しない場合はそのまま終了（仕様外ケースのガード）
          branch += " R0";
       } else if(redistribute < n){
          dmcmm_seq[1] += redistribute;
          branch += " RLT";
       } else {
-         long avg = total / (long)n;
          long rem = total % (long)n;
+         long avg = (total - rem) / (long)n;
          dmcmm_array_remove(dmcmm_seq, 0);
          int newLen = ArraySize(dmcmm_seq);
-         // 仕様通り一旦0化してから平均値を再配布
-         for(int i=0; i<newLen; i++) dmcmm_seq[i] = 0;
-         for(int i=0; i<newLen; i++) dmcmm_seq[i] += avg;
+         for(int i = 0; i < newLen; i++) dmcmm_seq[i] = avg;
          if(rem > 0){
             dmcmm_seq[0] += rem;
             branch += " RGE";
