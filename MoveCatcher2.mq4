@@ -5163,9 +5163,10 @@ void dmcmm_on_win(){
       dmcmm_seq[0]=0; dmcmm_seq[1]=1;
       branch="LEN2";
    } else if(len==3){
-      dmcmm_array_remove(dmcmm_seq,0);
-      dmcmm_array_remove(dmcmm_seq,ArraySize(dmcmm_seq)-1);
-      long v = dmcmm_seq[0];
+      // 初期数列から1番目と2番目を削除し、残った値を分解
+      dmcmm_array_remove(dmcmm_seq,0);      // 1番目を削除
+      dmcmm_array_remove(dmcmm_seq,1);      // 2番目（元の3番目）を削除
+      long v = dmcmm_seq[0];                // 残った中間値
       ArrayResize(dmcmm_seq,2);
       if(v%2==0){
          long h=v/2; dmcmm_seq[0]=h; dmcmm_seq[1]=h; branch="LEN3E";
@@ -5204,9 +5205,9 @@ void dmcmm_on_lose(){
    if(len>0 && dmcmm_seq[0] >=1){
       long redistribute = dmcmm_seq[0];
       dmcmm_seq[0]=0;
-      long total=0;
-      for(int i=0;i<ArraySize(dmcmm_seq);i++) total+=dmcmm_seq[i];
-      total += redistribute;
+      // 先頭を0化した後に再配布値を加えて合計を算出
+      long total = redistribute;
+      for(int i=1;i<ArraySize(dmcmm_seq);i++) total += dmcmm_seq[i];
       int n = ArraySize(dmcmm_seq)-1;
       if(n>0){
          if(redistribute < n){
