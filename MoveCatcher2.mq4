@@ -5132,19 +5132,22 @@ void dmcmm_average(){
    if(left==0){
       int n = len-1;
       if(n<=0) return;
-
       // 平均値と余剰を算出してから左端を削除
       long A = sum % (long)n;
       long avg = sum / (long)n;
       dmcmm_array_remove(dmcmm_seq,0);
-      for(int i=0;i<n;i++) dmcmm_seq[i] = avg;
+      // 仕様通り一旦0化してから平均値を再配布
+      for(int i=0;i<n;i++) dmcmm_seq[i] = 0;
+      for(int i=0;i<n;i++) dmcmm_seq[i] += avg;
       if(A>0) dmcmm_seq[0] += A;
       dmcmm_array_insert(dmcmm_seq,0,0);
       branch = (A>0) ? "L0A1" : "L0A0";
    } else {
       long B = sum % (long)len;
       long avg = sum / (long)len;
-      for(int i=0;i<len;i++) dmcmm_seq[i] = avg;
+      // 仕様通り一旦0化してから平均値を再配布
+      for(int i=0;i<len;i++) dmcmm_seq[i] = 0;
+      for(int i=0;i<len;i++) dmcmm_seq[i] += avg;
       if(B>0 && len>1) dmcmm_seq[1] += B;
       branch = (B>0 && len>1) ? "L1B1" : "L1B0";
    }
@@ -5221,7 +5224,9 @@ void dmcmm_on_lose(){
             long rem = total % (long)n;
             dmcmm_array_remove(dmcmm_seq, 0);
             int newLen = ArraySize(dmcmm_seq);
-            for(int i=0; i<newLen; i++) dmcmm_seq[i] = avg;
+            // 仕様通り一旦0化してから平均値を再配布
+            for(int i=0; i<newLen; i++) dmcmm_seq[i] = 0;
+            for(int i=0; i<newLen; i++) dmcmm_seq[i] += avg;
             if(rem > 0){
                dmcmm_seq[0] += rem;
                branch += " RGE";
