@@ -5123,33 +5123,33 @@ void dmcmm_average(){
    int len = ArraySize(dmcmm_seq);
    if(len <= 0) return;
 
-   // 事前に合計を算出して仕様と同じ分岐条件を得る
-   long sum = 0;
-   for(int i = 0; i < len; i++) sum += dmcmm_seq[i];
+   long total = 0;
+   for(int i = 0; i < len; i++) total += dmcmm_seq[i];
    long left = dmcmm_seq[0];
    string branch = "";
 
    if(left == 0){
       int n = len - 1;
       if(n <= 0){
+         ArrayResize(dmcmm_seq,1);
          dmcmm_seq[0] = 0;
          dmcmm_log(2, StringFormat("average(%s) seq=[%s]", "L0EMP", dmcmm_seq_to_string()));
          return;
       }
-      long A = sum % (long)n;
-      long avg = (sum - A) / (long)n;
+      long rem = total % (long)n;
+      long avg = total / (long)n;
       dmcmm_array_remove(dmcmm_seq,0);
       for(int i = 0; i < n; i++) dmcmm_seq[i] = avg;
-      if(A > 0) dmcmm_seq[0] += A;
+      if(rem > 0) dmcmm_seq[0] += rem;
       dmcmm_array_insert(dmcmm_seq,0,0);
-      branch = (A > 0) ? "L0A1" : "L0A0";
+      branch = (rem > 0) ? "L0A1" : "L0A0";
    } else {
       int n = len;
-      long B = sum % (long)n;
-      long avg = (sum - B) / (long)n;
+      long rem = total % (long)n;
+      long avg = total / (long)n;
       for(int i = 0; i < n; i++) dmcmm_seq[i] = avg;
-      if(B > 0 && n > 1) dmcmm_seq[1] += B;
-      branch = (B > 0 && n > 1) ? "L1B1" : "L1B0";
+      if(rem > 0 && n > 1) dmcmm_seq[1] += rem;
+      branch = (rem > 0 && n > 1) ? "L1B1" : "L1B0";
    }
 
    dmcmm_log(2, StringFormat("average(%s) seq=[%s]", branch, dmcmm_seq_to_string()));
@@ -5201,8 +5201,8 @@ void dmcmm_on_lose(){
    dmcmm_average();
    len = ArraySize(dmcmm_seq);
    string branch="";
-   // ストック消費（左>0 の場合のみ）
-   if(len>0 && dmcmm_seq[0] > 0 && dmcmm_seq[0] <= dmcmm_stock){
+   // ストック消費（初期数列(1)がストック以下なら）
+   if(len>0 && dmcmm_seq[0] <= dmcmm_stock){
       dmcmm_stock -= dmcmm_seq[0];
       dmcmm_seq[0] = 0;
       branch = "STOCK";
