@@ -5123,33 +5123,39 @@ void dmcmm_average(){
    int len = ArraySize(dmcmm_seq);
    if(len<=0) return;
 
-   long sum = 0;
-   for(int i=0;i<len;i++) sum += dmcmm_seq[i];
-
    long left = dmcmm_seq[0];
    string branch="";
 
    if(left==0){
-      int n = len-1;
-      if(n<=0) return;
-      // 平均値と余剰を算出してから左端を削除
+      // 仕様通り先に左端を削除してから合計と平均を計算
+      dmcmm_array_remove(dmcmm_seq,0);
+      int n = ArraySize(dmcmm_seq);
+      if(n<=0){
+         dmcmm_array_insert(dmcmm_seq,0,0);
+         dmcmm_log(2, StringFormat("average(%s) seq=[%s]", "L0EMP", dmcmm_seq_to_string()));
+         return;
+      }
+      long sum = 0;
+      for(int i=0;i<n;i++) sum += dmcmm_seq[i];
       long A = sum % (long)n;
       long avg = sum / (long)n;
-      dmcmm_array_remove(dmcmm_seq,0);
-      // 仕様通り一旦0化してから平均値を再配布
+      // 一旦0化してから平均値を再配布
       for(int i=0;i<n;i++) dmcmm_seq[i] = 0;
       for(int i=0;i<n;i++) dmcmm_seq[i] += avg;
       if(A>0) dmcmm_seq[0] += A;
       dmcmm_array_insert(dmcmm_seq,0,0);
       branch = (A>0) ? "L0A1" : "L0A0";
    } else {
-      long B = sum % (long)len;
-      long avg = sum / (long)len;
-      // 仕様通り一旦0化してから平均値を再配布
-      for(int i=0;i<len;i++) dmcmm_seq[i] = 0;
-      for(int i=0;i<len;i++) dmcmm_seq[i] += avg;
-      if(B>0 && len>1) dmcmm_seq[1] += B;
-      branch = (B>0 && len>1) ? "L1B1" : "L1B0";
+      int n = len;
+      long sum = 0;
+      for(int i=0;i<n;i++) sum += dmcmm_seq[i];
+      long B = sum % (long)n;
+      long avg = sum / (long)n;
+      // 一旦0化してから平均値を再配布
+      for(int i=0;i<n;i++) dmcmm_seq[i] = 0;
+      for(int i=0;i<n;i++) dmcmm_seq[i] += avg;
+      if(B>0 && n>1) dmcmm_seq[1] += B;
+      branch = (B>0 && n>1) ? "L1B1" : "L1B0";
    }
 
    dmcmm_log(2, StringFormat("average(%s) seq=[%s]", branch, dmcmm_seq_to_string()));
