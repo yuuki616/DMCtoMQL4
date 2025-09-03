@@ -5201,7 +5201,8 @@ void dmcmm_on_lose(){
    dmcmm_average();
    len = ArraySize(dmcmm_seq);
    string branch="";
-   if(len>0 && dmcmm_seq[0] <= dmcmm_stock){
+   // ストック消費（左>0 の場合のみ）
+   if(len>0 && dmcmm_seq[0] > 0 && dmcmm_seq[0] <= dmcmm_stock){
       dmcmm_stock -= dmcmm_seq[0];
       dmcmm_seq[0] = 0;
       branch = "STOCK";
