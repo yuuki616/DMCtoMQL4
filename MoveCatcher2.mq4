@@ -5190,7 +5190,8 @@ void dmcmm_on_lose(){
    }
    dmcmm_streak = 0;
    int len = ArraySize(dmcmm_seq);
-   if(len>0){
+   // 数列個数が2以上のときのみ末尾に（左+右）を追加する
+   if(len>=2){
       long add = dmcmm_seq[0] + dmcmm_seq[len-1];
       dmcmm_array_insert(dmcmm_seq, len, add);
    }
@@ -5208,8 +5209,9 @@ void dmcmm_on_lose(){
       int size = ArraySize(dmcmm_seq);
       int n = size - 1;
       // 合計は先頭0化後の合計に再配布値を加えて算出
-      long total = redistribute;
-      for(int i=1; i<size; i++) total += dmcmm_seq[i];
+      long total = 0;
+      for(int i=0; i<size; i++) total += dmcmm_seq[i];
+      total += redistribute;
       if(n>0){
          if(redistribute < n){
             if(size > 1) dmcmm_seq[1] += redistribute;
