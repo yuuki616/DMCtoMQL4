@@ -5133,21 +5133,12 @@ void dmcmm_average(){
       dmcmm_array_remove(dmcmm_seq,0);
       int newLen = ArraySize(dmcmm_seq);
       if(newLen<=0) return;
-      if(A==0){
-         for(int i=0;i<newLen;i++) dmcmm_seq[i]=0;
-         long avg = sum/newLen;
-         for(int i=0;i<newLen;i++) dmcmm_seq[i]+=avg;
-         dmcmm_array_insert(dmcmm_seq,0,0);
-         branch="L0A0";
-      } else {
-         for(int i=0;i<newLen;i++) dmcmm_seq[i]=0;
-         long avg = sum/newLen;
-         long rem = sum%newLen;
-         for(int i=0;i<newLen;i++) dmcmm_seq[i]+=avg;
-         dmcmm_seq[0]+=rem;
-         dmcmm_array_insert(dmcmm_seq,0,0);
-         branch="L0A1";
-      }
+      for(int i=0;i<newLen;i++) dmcmm_seq[i]=0;
+      long avg = sum/newLen;
+      for(int i=0;i<newLen;i++) dmcmm_seq[i]+=avg;
+      if(A>0) dmcmm_seq[0]+=A;
+      dmcmm_array_insert(dmcmm_seq,0,0);
+      branch = (A>0) ? "L0A1" : "L0A0";
    } else {
       for(int i=0;i<len;i++) dmcmm_seq[i]=0;
       long avg = sum/len;
@@ -5216,18 +5207,21 @@ void dmcmm_on_lose(){
       int n = ArraySize(dmcmm_seq)-1;
       if(n>0){
          if(redistribute < n){
-            dmcmm_seq[1]+=redistribute;
+            if(ArraySize(dmcmm_seq)>1) dmcmm_seq[1]+=redistribute;
             branch+=" RLT";
          } else {
-            long r = total % n;
             long avg = total / n;
+            long rem = total % n;
             dmcmm_array_remove(dmcmm_seq,0);
             int newLen = ArraySize(dmcmm_seq);
-            for(int i=0;i<newLen;i++) dmcmm_seq[i]=0;
-            for(int i=0;i<newLen;i++) dmcmm_seq[i]+=avg;
-            if(r>0) dmcmm_seq[0]+=r;
+            for(int i=0;i<newLen;i++) dmcmm_seq[i]=avg;
+            if(rem>0){
+               dmcmm_seq[0]+=rem;
+               branch+=" RGE";
+            } else {
+               branch+=" RG";
+            }
             dmcmm_array_insert(dmcmm_seq,0,0);
-            branch += (r>0) ? " RGE" : " RG";
          }
       }
    }
