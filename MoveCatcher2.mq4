@@ -5204,28 +5204,29 @@ void dmcmm_on_lose(){
    }
    if(len>0 && dmcmm_seq[0] >=1){
       long redistribute = dmcmm_seq[0];
-      dmcmm_seq[0]=0;
-      // 先頭を0化した後に再配布値を加えて合計を算出
-      long total = redistribute;
-      for(int i=1;i<ArraySize(dmcmm_seq);i++) total += dmcmm_seq[i];
-      int n = ArraySize(dmcmm_seq)-1;
+      dmcmm_seq[0] = 0;
+      // 合計は先頭を0化した後の合計に再配布値を足して算出
+      long total = 0;
+      for(int i=0; i<ArraySize(dmcmm_seq); i++) total += dmcmm_seq[i];
+      total += redistribute;
+      int n = ArraySize(dmcmm_seq) - 1;
       if(n>0){
          if(redistribute < n){
-            if(ArraySize(dmcmm_seq)>1) dmcmm_seq[1]+=redistribute;
-            branch+=" RLT";
+            if(ArraySize(dmcmm_seq) > 1) dmcmm_seq[1] += redistribute;
+            branch += " RLT";
          } else {
             long avg = total / (long)n;
             long rem = total % (long)n;
-            dmcmm_array_remove(dmcmm_seq,0);
+            dmcmm_array_remove(dmcmm_seq, 0);
             int newLen = ArraySize(dmcmm_seq);
-            for(int i=0;i<newLen;i++) dmcmm_seq[i]=avg;
-            if(rem>0){
-               dmcmm_seq[0]+=rem;
-               branch+=" RGE";
+            for(int i=0; i<newLen; i++) dmcmm_seq[i] = avg;
+            if(rem > 0){
+               dmcmm_seq[0] += rem;
+               branch += " RGE";
             } else {
-               branch+=" RG";
+               branch += " RG";
             }
-            dmcmm_array_insert(dmcmm_seq,0,0);
+            dmcmm_array_insert(dmcmm_seq, 0, 0);
          }
       }
    }
