@@ -5221,26 +5221,27 @@ void dmcmm_on_lose(){
       long total = 0;
       for(int i=0; i<size; i++) total += dmcmm_seq[i];
       total += redistribute;
-      if(n>0){
-         if(redistribute < n){
-            if(size > 1) dmcmm_seq[1] += redistribute;
-            branch += " RLT";
+      if(n <= 0){
+         // 再配布対象が存在しない場合はそのまま終了（仕様外ケースのガード）
+         branch += " R0";
+      } else if(redistribute < n){
+         dmcmm_seq[1] += redistribute;
+         branch += " RLT";
+      } else {
+         long avg = total / (long)n;
+         long rem = total % (long)n;
+         dmcmm_array_remove(dmcmm_seq, 0);
+         int newLen = ArraySize(dmcmm_seq);
+         // 仕様通り一旦0化してから平均値を再配布
+         for(int i=0; i<newLen; i++) dmcmm_seq[i] = 0;
+         for(int i=0; i<newLen; i++) dmcmm_seq[i] += avg;
+         if(rem > 0){
+            dmcmm_seq[0] += rem;
+            branch += " RGE";
          } else {
-            long avg = total / (long)n;
-            long rem = total % (long)n;
-            dmcmm_array_remove(dmcmm_seq, 0);
-            int newLen = ArraySize(dmcmm_seq);
-            // 仕様通り一旦0化してから平均値を再配布
-            for(int i=0; i<newLen; i++) dmcmm_seq[i] = 0;
-            for(int i=0; i<newLen; i++) dmcmm_seq[i] += avg;
-            if(rem > 0){
-               dmcmm_seq[0] += rem;
-               branch += " RGE";
-            } else {
-               branch += " RG";
-            }
-            dmcmm_array_insert(dmcmm_seq, 0, 0);
+            branch += " RG";
          }
+         dmcmm_array_insert(dmcmm_seq, 0, 0);
       }
    }
    dmcmm_log(2, StringFormat("lose(%s) seq=[%s] stock=%I64d streak=%d", branch, dmcmm_seq_to_string(), dmcmm_stock, dmcmm_streak));
