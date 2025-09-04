@@ -5203,7 +5203,8 @@ void dmcmm_on_lose(){
    len = ArraySize(dmcmm_seq);
    string branch="";
    // ストック消費（初期数列(1)がストック以下なら）
-   if(len>0 && dmcmm_seq[0] <= dmcmm_stock){
+   // ストック消費は左端が1以上かつストック以下のときのみ実行する
+   if(len>0 && dmcmm_seq[0] > 0 && dmcmm_seq[0] <= dmcmm_stock){
       dmcmm_stock -= dmcmm_seq[0];
       dmcmm_seq[0] = 0;
       branch = "STOCK";
