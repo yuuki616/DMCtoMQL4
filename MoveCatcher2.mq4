@@ -5158,10 +5158,17 @@ void dmcmm_average(){
 
 void dmcmm_on_win(){
    int len = ArraySize(dmcmm_seq);
-   if(len<2) return;
+   if(len < 2){
+      dmcmm_reset();
+      return;
+   }
    long left = dmcmm_seq[0];
    long right = dmcmm_seq[len-1];
-   if(len==2 && left==0 && right==1) dmcmm_streak++;
+   if(len==2 && left==0 && right==1){
+      dmcmm_streak++;
+   } else {
+      dmcmm_streak = 0;
+   }
    string branch="";
    if(len==2){
       dmcmm_seq[0]=0; dmcmm_seq[1]=1;
