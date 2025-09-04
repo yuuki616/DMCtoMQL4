@@ -5131,9 +5131,10 @@ void dmcmm_average(){
    if(left == 0){
       int n = len - 1;
       if(n <= 0){
-         ArrayResize(dmcmm_seq,1);
+         ArrayResize(dmcmm_seq,2);
          dmcmm_seq[0] = 0;
-         dmcmm_log(2, StringFormat("average(%s) seq=[%s]", "L0EMP", dmcmm_seq_to_string()));
+         dmcmm_seq[1] = 1;
+         dmcmm_log(2, StringFormat("average(%s) seq=[%s]", "L0RST", dmcmm_seq_to_string()));
          return;
       }
       long rem = total % (long)n;
@@ -5217,6 +5218,9 @@ void dmcmm_on_lose(){
       for(int i = 1; i < size; i++) sumZero += dmcmm_seq[i];
       long total = sumZero + redistribute;
       if(n <= 0){
+         ArrayResize(dmcmm_seq,2);
+         dmcmm_seq[0]=0;
+         dmcmm_seq[1]=1;
          branch += " R0";
       } else if(redistribute < n){
          dmcmm_seq[1] += redistribute;
