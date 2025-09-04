@@ -5222,10 +5222,11 @@ void dmcmm_on_lose(){
       dmcmm_seq[0] = 0;
       int size = ArraySize(dmcmm_seq);
       int n = size - 1;
-      // 合計数列値 = （先頭0化後の合計）＋再配布値（仕様準拠）
-      long sumZero = 0;
-      for(int i = 1; i < size; i++) sumZero += dmcmm_seq[i];
-      long total = sumZero + redistribute;
+      // 合計数列値 =（先頭を0にした後の合計）+再配布値
+      // 仕様では先頭0化後の全要素合計を用いるため、0となった先頭も含めて集計する
+      long sumAfterZero = 0;
+      for(int i = 0; i < size; i++) sumAfterZero += dmcmm_seq[i];
+      long total = sumAfterZero + redistribute;
       if(n <= 0){
          ArrayResize(dmcmm_seq,2);
          dmcmm_seq[0]=0;
