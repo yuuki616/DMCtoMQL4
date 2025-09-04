@@ -5202,12 +5202,13 @@ void dmcmm_on_lose(){
    dmcmm_average();
    len = ArraySize(dmcmm_seq);
    string branch="";
-   // ストック消費（初期数列(1)がストック以下なら）
-   // ストック消費は左端が1以上かつストック以下のときのみ実行する
-   if(len>0 && dmcmm_seq[0] > 0 && dmcmm_seq[0] <= dmcmm_stock){
+   // ストック消費（初期数列(1)がストック以下なら、0も含む）
+   if(len>0 && dmcmm_seq[0] <= dmcmm_stock){
+      if(dmcmm_seq[0] > 0){
+         branch = "STOCK"; // 0消費のみの場合はログを残さない
+      }
       dmcmm_stock -= dmcmm_seq[0];
       dmcmm_seq[0] = 0;
-      branch = "STOCK";
    }
    if(len>0 && dmcmm_seq[0] >= 1){
       long redistribute = dmcmm_seq[0];
