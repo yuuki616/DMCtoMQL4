@@ -5196,7 +5196,7 @@ void dmcmm_on_lose(){
    int len = ArraySize(dmcmm_seq);
    // 数列個数に関わらず末尾に（左+右）を追加する（仕様準拠）
    long left = (len>0) ? dmcmm_seq[0] : 0;
-   long right = (len>1) ? dmcmm_seq[len-1] : 0; // len==1 の場合は右端を0とみなす
+   long right = (len>1) ? dmcmm_seq[len-1] : left; // len==1 の場合は右端=左端
    long add = left + right;
    dmcmm_array_insert(dmcmm_seq, len, add);
    dmcmm_average();
@@ -5296,7 +5296,11 @@ double dmcmm_calc_lot(string symbol,int magic){
    dmcmm_load(symbol,magic);
    int len = ArraySize(dmcmm_seq);
    long bet=0;
-   if(len>=2) bet = dmcmm_seq[0] + dmcmm_seq[len-1];
+   if(len>0){
+      long left = dmcmm_seq[0];
+      long right = dmcmm_seq[len-1];
+      bet = left + right;
+   }
    int mult = 1;
    if(dmcmm_streak==3) mult=2;
    else if(dmcmm_streak==4) mult=3;
